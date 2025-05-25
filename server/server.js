@@ -2,447 +2,254 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
-const { initializeDatabase } = require('./database');
+// Import the *instance* of DatabaseManager that is exported by database.js
+const dbManagerInstance = require('./database'); // This variable now holds the single instance
 
-const app = express();
+const AuxDataRepository = require('./repositories/AuxDataRepository');
+const ExpenseRepository = require('./repositories/ExpenseRepository');
+
+class ExpenseManagerServer {
+    /**
+     * Initializes the ExpenseManagerServer.
+     * @param {DatabaseManager} dbManager - The pre-instantiated DatabaseManager instance.
+     * @param {number} port - The port to run the server on.
+     */
+    constructor(dbManager, port) {
+        this.app = express();
+        this.port = port;
+        this.dbManager = dbManager; // Assign the passed-in instance to the class property
+
+        // Repositories - these now correctly use the injected dbManager instance
+        this.groupRepository = new AuxDataRepository(this.dbManager, 'ExpenseGroups', 'expense_group_id');
+        this.categoryRepository = new AuxDataRepository(this.dbManager, 'ExpenseCategories', 'expense_category_id');
+        this.payerRepository = new AuxDataRepository(this.dbManager, 'Payers', 'payer_id');
+        this.paymentModeRepository = new AuxDataRepository(this.dbManager, 'PaymentMode', 'payment_mode_id');
+        this.expenseRepository = new ExpenseRepository(this.dbManager);
+
+        this._setupMiddleware();
+        this._setupRoutes();
+    }
+
+    _setupMiddleware() {
+        this.app.use(bodyParser.json());
+        // Serve static files from the 'public' directory
+        this.app.use(express.static(path.join(__dirname, '../public')));
+    }
+
+    _setupRoutes() {
+        // Endpoint to initialize/check database (called by frontend on load)
+        this.app.get('/api/init-db', this._handleInitDb.bind(this));
+
+        // Generic CRUD routes for master data using repositories
+        this.app.get('/api/groups', this._handleGetAll.bind(this, this.groupRepository));
+        this.app.post('/api/groups', this._handleAdd.bind(this, this.groupRepository));
+        this.app.put('/api/groups/:id', this._handleUpdate.bind(this, this.groupRepository));
+        this.app.delete('/api/groups/:id', this._handleDelete.bind(this, this.groupRepository));
+
+        this.app.get('/api/categories', this._handleGetAll.bind(this, this.categoryRepository));
+        this.app.post('/api/categories', this._handleAdd.bind(this, this.categoryRepository));
+        this.app.put('/api/categories/:id', this._handleUpdate.bind(this, this.categoryRepository));
+        this.app.delete('/api/categories/:id', this._handleDelete.bind(this, this.categoryRepository));
+
+        this.app.get('/api/payers', this._handleGetAll.bind(this, this.payerRepository));
+        this.app.post('/api/payers', this._handleAdd.bind(this, this.payerRepository));
+        this.app.put('/api/payers/:id', this._handleUpdate.bind(this, this.payerRepository));
+        this.app.delete('/api/payers/:id', this._handleDelete.bind(this, this.payerRepository));
+
+        this.app.get('/api/payment-modes', this._handleGetAll.bind(this, this.paymentModeRepository));
+        this.app.post('/api/payment-modes', this._handleAdd.bind(this, this.paymentModeRepository));
+        this.app.put('/api/payment-modes/:id', this._handleUpdate.bind(this, this.paymentModeRepository));
+        this.app.delete('/api/payment-modes/:id', this._handleDelete.bind(this, this.paymentModeRepository));
+
+        // Expense specific routes using ExpenseRepository
+        this.app.get('/api/expenses', this._handleGetAllExpenses.bind(this));
+        this.app.post('/api/expenses', this._handleAddExpense.bind(this));
+        this.app.put('/api/expenses/:id', this._handleUpdateExpense.bind(this));
+        this.app.delete('/api/expenses/:id', this._handleDeleteExpense.bind(this));
+    }
+
+    /**
+     * Handles the initial database setup request.
+     */
+    async _handleInitDb(req, res) {
+        try {
+            await this.dbManager.initialize();
+            res.status(200).send({ message: 'Database initialized and ready.' });
+        } catch (error) {
+            console.error('Failed to initialize database:', error);
+            res.status(500).json({ error: 'Failed to initialize database.' });
+        }
+    }
+
+    /**
+     * Generic handler for fetching all records from a repository.
+     */
+    async _handleGetAll(repository, req, res) {
+        try {
+            const data = await repository.getAll();
+            res.json(data);
+        } catch (err) {
+            console.error(`Error fetching from ${repository.tableName}:`, err.message);
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    /**
+     * Generic handler for adding a new record via a repository.
+     */
+    async _handleAdd(repository, req, res) {
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: 'Name is required.' });
+        }
+        try {
+            const newEntity = await repository.add(name);
+            res.status(201).json(newEntity);
+        } catch (err) {
+            if (err.message.includes('UNIQUE constraint failed')) {
+                res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    /**
+     * Generic handler for updating an existing record via a repository.
+     */
+    async _handleUpdate(repository, req, res) {
+        const { id } = req.params;
+        const { name } = req.body;
+        if (!name) {
+            return res.status(400).json({ error: 'Name is required.' });
+        }
+        try {
+            const updatedEntity = await repository.update(id, name);
+            res.json(updatedEntity);
+        } catch (err) {
+            if (err.message.includes('not found or no changes made')) {
+                res.status(404).json({ error: err.message });
+            } else if (err.message.includes('UNIQUE constraint failed')) {
+                res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    /**
+     * Generic handler for deleting a record via a repository.
+     */
+    async _handleDelete(repository, req, res) {
+        const { id } = req.params;
+        try {
+            await repository.delete(id);
+            res.status(204).send(); // No content for successful deletion
+        } catch (err) {
+            if (err.message.includes('not found')) {
+                res.status(404).json({ error: err.message });
+            } else if (err.message.includes('associated with existing expenses')) {
+                res.status(400).json({ error: err.message });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    // Expense specific handlers, utilizing ExpenseRepository
+    async _handleGetAllExpenses(req, res) {
+        try {
+            const expenses = await this.expenseRepository.getAllExpenses();
+            res.json(expenses);
+        } catch (err) {
+            console.error('Error fetching expenses:', err.message);
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async _handleAddExpense(req, res) {
+        const expenseData = req.body;
+        if (!this._validateExpenseData(expenseData, res)) {
+            return; // Validation failed, response sent by _validateExpenseData
+        }
+        try {
+            const newExpense = await this.expenseRepository.addExpense(expenseData);
+            res.status(201).json(newExpense);
+        } catch (err) {
+            if (err.message.includes('FOREIGN KEY constraint failed')) {
+                res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided.' });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    async _handleUpdateExpense(req, res) {
+        const { id } = req.params;
+        const expenseData = req.body;
+        if (!this._validateExpenseData(expenseData, res, true)) {
+            return; // Validation failed, response sent by _validateExpenseData
+        }
+        try {
+            const updatedExpense = await this.expenseRepository.updateExpense(id, expenseData);
+            res.json(updatedExpense);
+        } catch (err) {
+            if (err.message.includes('not found or no changes made')) {
+                res.status(404).json({ error: err.message });
+            } else if (err.message.includes('FOREIGN KEY constraint failed')) {
+                res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided for update.' });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    async _handleDeleteExpense(req, res) {
+        const { id } = req.params;
+        try {
+            await this.expenseRepository.deleteExpense(id);
+            res.status(204).send();
+        } catch (err) {
+            if (err.message.includes('not found')) {
+                res.status(404).json({ error: err.message });
+            } else {
+                res.status(500).json({ error: err.message });
+            }
+        }
+    }
+
+    /**
+     * Validates expense data for both creation and update operations.
+     * @private
+     */
+    _validateExpenseData(expenseData, res, isUpdate = false) {
+        const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount } = expenseData;
+        if (!expense_group_id || !expense_category_id || !payer_id || !payment_mode_id || !date || amount === undefined || amount === null) {
+            const message = isUpdate ? 'All required expense fields must be provided for update.' : 'All required expense fields must be provided.';
+            res.status(400).json({ error: message });
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * Starts the Express server.
+     */
+    async start() {
+        try {
+            await this.dbManager.initialize(); // Initialize the database using the injected instance
+            this.app.listen(this.port, () => {
+                console.log(`Server running on http://localhost:${this.port}`);
+            });
+        } catch (err) {
+            console.error('Failed to start server due to database error:', err);
+            // Exit process or handle more gracefully in a real application
+            process.exit(1);
+        }
+    }
+}
+
+// Instantiate and start the server using the imported dbManagerInstance
 const PORT = 3000;
-
-let db; // Database instance
-
-// Middleware
-app.use(bodyParser.json()); // To parse JSON request bodies
-app.use(express.static(path.join(__dirname, '../public'))); // Serve static files from the 'public' directory
-
-// --- API Endpoints ---
-
-// Endpoint to initialize/check database (called by frontend on load)
-app.get('/api/init-db', async (req, res) => {
-    try {
-        if (!db) {
-            db = await initializeDatabase();
-        }
-        res.status(200).send({ message: 'Database initialized and ready.' });
-    } catch (error) {
-        console.error('Failed to initialize database:', error);
-        res.status(500).json({ error: 'Failed to initialize database.' });
-    }
-});
-
-// Generic CRUD functions for master data (Groups, Categories, Payers, Payment Modes)
-// These functions abstract the common logic for these tables.
-
-/**
- * Executes a database query and returns results.
- * @param {string} sql - SQL query string.
- * @param {Array<any>} params - Parameters for the SQL query.
- * @returns {Promise<Array<Object>>} Promise resolving to query results.
- */
-function runQuery(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.all(sql, params, (err, rows) => {
-            if (err) {
-                reject(err);
-            } else {
-                resolve(rows);
-            }
-        });
-    });
-}
-
-/**
- * Executes a database run command (INSERT, UPDATE, DELETE).
- * @param {string} sql - SQL query string.
- * @param {Array<any>} params - Parameters for the SQL query.
- * @returns {Promise<{ id?: number, changes: number }>} Promise resolving to lastID for inserts, changes for update/delete.
- */
-function runCommand(sql, params = []) {
-    return new Promise((resolve, reject) => {
-        db.run(sql, params, function(err) {
-            if (err) {
-                reject(err);
-            } else {
-                resolve({ id: this.lastID, changes: this.changes });
-            }
-        });
-    });
-}
-
-/**
- * Checks if an entity is referenced by any expenses.
- * @param {string} fkColumnName - The foreign key column name in the Expenses table (e.g., 'expense_group_id').
- * @param {number} entityId - The ID of the entity to check.
- * @returns {Promise<boolean>} True if referenced, false otherwise.
- */
-async function isEntityReferenced(fkColumnName, entityId) {
-    const sql = `SELECT COUNT(*) AS count FROM Expenses WHERE ${fkColumnName} = ?`;
-    const rows = await runQuery(sql, [entityId]);
-    return rows[0].count > 0;
-}
-
-// --- Expense Groups Endpoints ---
-app.get('/api/groups', async (req, res) => {
-    try {
-        const groups = await runQuery('SELECT * FROM ExpenseGroups');
-        res.json(groups);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/groups', async (req, res) => {
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'Group name is required.' });
-    }
-    try {
-        const result = await runCommand('INSERT INTO ExpenseGroups (name) VALUES (?)', [name]);
-        res.status(201).json({ id: result.id, name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Group name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/groups/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'New group name is required.' });
-    }
-    try {
-        const result = await runCommand('UPDATE ExpenseGroups SET name = ? WHERE id = ?', [name, id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Group not found.' });
-        }
-        res.json({ id: parseInt(id), name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Group name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.delete('/api/groups/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const referenced = await isEntityReferenced('expense_group_id', id);
-        if (referenced) {
-            return res.status(409).json({ error: 'Cannot delete group: it is associated with existing expenses.' });
-        }
-        const result = await runCommand('DELETE FROM ExpenseGroups WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Group not found.' });
-        }
-        res.status(204).send(); // No content
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- Expense Categories Endpoints ---
-app.get('/api/categories', async (req, res) => {
-    try {
-        const categories = await runQuery('SELECT * FROM ExpenseCategories');
-        res.json(categories);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/categories', async (req, res) => {
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'Category name is required.' });
-    }
-    try {
-        const result = await runCommand('INSERT INTO ExpenseCategories (name) VALUES (?)', [name]);
-        res.status(201).json({ id: result.id, name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Category name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/categories/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'New category name is required.' });
-    }
-    try {
-        const result = await runCommand('UPDATE ExpenseCategories SET name = ? WHERE id = ?', [name, id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Category not found.' });
-        }
-        res.json({ id: parseInt(id), name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Category name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.delete('/api/categories/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const referenced = await isEntityReferenced('expense_category_id', id);
-        if (referenced) {
-            return res.status(409).json({ error: 'Cannot delete category: it is associated with existing expenses.' });
-        }
-        const result = await runCommand('DELETE FROM ExpenseCategories WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Category not found.' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- Payers Endpoints ---
-app.get('/api/payers', async (req, res) => {
-    try {
-        const payers = await runQuery('SELECT * FROM Payers');
-        res.json(payers);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/payers', async (req, res) => {
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'Payer name is required.' });
-    }
-    try {
-        const result = await runCommand('INSERT INTO Payers (name) VALUES (?)', [name]);
-        res.status(201).json({ id: result.id, name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Payer name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/payers/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'New payer name is required.' });
-    }
-    try {
-        const result = await runCommand('UPDATE Payers SET name = ? WHERE id = ?', [name, id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Payer not found.' });
-        }
-        res.json({ id: parseInt(id), name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Payer name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.delete('/api/payers/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const referenced = await isEntityReferenced('payer_id', id);
-        if (referenced) {
-            return res.status(409).json({ error: 'Cannot delete payer: it is associated with existing expenses.' });
-        }
-        const result = await runCommand('DELETE FROM Payers WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Payer not found.' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- Payment Modes Endpoints ---
-app.get('/api/payment-modes', async (req, res) => {
-    try {
-        const paymentModes = await runQuery('SELECT * FROM PaymentMode');
-        res.json(paymentModes);
-    }
-    catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/payment-modes', async (req, res) => {
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'Payment mode name is required.' });
-    }
-    try {
-        const result = await runCommand('INSERT INTO PaymentMode (name) VALUES (?)', [name]);
-        res.status(201).json({ id: result.id, name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Payment mode name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/payment-modes/:id', async (req, res) => {
-    const { id } = req.params;
-    const { name } = req.body;
-    if (!name) {
-        return res.status(400).json({ error: 'New payment mode name is required.' });
-    }
-    try {
-        const result = await runCommand('UPDATE PaymentMode SET name = ? WHERE id = ?', [name, id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Payment mode not found.' });
-        }
-        res.json({ id: parseInt(id), name });
-    } catch (err) {
-        if (err.message.includes('UNIQUE constraint failed')) {
-            res.status(409).json({ error: 'Payment mode name already exists.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.delete('/api/payment-modes/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const referenced = await isEntityReferenced('payment_mode_id', id);
-        if (referenced) {
-            return res.status(409).json({ error: 'Cannot delete payment mode: it is associated with existing expenses.' });
-        }
-        const result = await runCommand('DELETE FROM PaymentMode WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Payment mode not found.' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-// --- Expenses Endpoints ---
-app.get('/api/expenses', async (req, res) => {
-    try {
-        // Join with other tables to get names for display
-        const sql = `
-            SELECT
-                e.id,
-                e.date,
-                e.amount,
-                e.expense_description,
-                eg.name AS group_name,
-                ec.name AS category_name,
-                p.name AS payer_name,
-                pm.name AS payment_mode_name,
-                e.expense_group_id,
-                e.expense_category_id,
-                e.payer_id,
-                e.payment_mode_id
-            FROM Expenses e
-            JOIN ExpenseGroups eg ON e.expense_group_id = eg.id
-            JOIN ExpenseCategories ec ON e.expense_category_id = ec.id
-            JOIN Payers p ON e.payer_id = p.id
-            JOIN PaymentMode pm ON e.payment_mode_id = pm.id
-            ORDER BY e.date DESC
-        `;
-        const expenses = await runQuery(sql);
-        res.json(expenses);
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-app.post('/api/expenses', async (req, res) => {
-    const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = req.body;
-    if (!expense_group_id || !expense_category_id || !payer_id || !payment_mode_id || !date || amount === undefined || amount === null) {
-        return res.status(400).json({ error: 'All required expense fields must be provided.' });
-    }
-    try {
-        const result = await runCommand(
-            'INSERT INTO Expenses (expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-            [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description]
-        );
-        res.status(201).json({ id: result.id, ...req.body });
-    } catch (err) {
-        // Handle foreign key constraint errors if they occur (though schema.sql should prevent this)
-        if (err.message.includes('FOREIGN KEY constraint failed')) {
-            res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-app.put('/api/expenses/:id', async (req, res) => {
-    const { id } = req.params;
-    const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = req.body;
-
-    if (!expense_group_id || !expense_category_id || !payer_id || !payment_mode_id || !date || amount === undefined || amount === null) {
-        return res.status(400).json({ error: 'All required expense fields must be provided for update.' });
-    }
-
-    try {
-        const result = await runCommand(
-            'UPDATE Expenses SET expense_group_id = ?, expense_category_id = ?, payer_id = ?, payment_mode_id = ?, date = ?, amount = ?, expense_description = ? WHERE id = ?',
-            [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description, id]
-        );
-
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Expense not found or no changes made.' });
-        }
-        res.json({ id: parseInt(id), ...req.body });
-    } catch (err) {
-        if (err.message.includes('FOREIGN KEY constraint failed')) {
-            res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided for update.' });
-        } else {
-            res.status(500).json({ error: err.message });
-        }
-    }
-});
-
-
-app.delete('/api/expenses/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        const result = await runCommand('DELETE FROM Expenses WHERE id = ?', [id]);
-        if (result.changes === 0) {
-            return res.status(404).json({ error: 'Expense not found.' });
-        }
-        res.status(204).send();
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
-});
-
-
-// Initialize database and start server
-initializeDatabase()
-    .then((databaseInstance) => {
-        db = databaseInstance;
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`);
-        });
-    })
-    .catch((err) => {
-        console.error('Failed to start server due to database error:', err);
-    });
+const server = new ExpenseManagerServer(dbManagerInstance, PORT);
+server.start();

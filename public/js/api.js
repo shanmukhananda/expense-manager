@@ -4,9 +4,10 @@
  * ApiService class to handle all API interactions with the backend.
  * Uses Fetch API to make requests to the Node.js server.
  */
-export class ApiService { // Added 'export' keyword here
+export class ApiService {
     constructor() {
-        this.baseUrl = '/api'; // Base URL for API endpoints
+        // Ensure this matches your server's port
+        this.baseUrl = 'http://localhost:3000/api';
     }
 
     /**
