@@ -5,7 +5,7 @@
  * It does not directly interact with data; it receives data to render and
  * emits events for actions (e.g., add, edit, delete).
  */
-export class UIManager { // Added 'export' keyword here
+export class UIManager {
     constructor() {
         // Cache DOM elements
         this.elements = {
@@ -51,11 +51,25 @@ export class UIManager { // Added 'export' keyword here
             infoModalTitle: document.getElementById('info-modal-title'),
             infoModalMessage: document.getElementById('info-modal-message'),
             infoModalOkBtn: document.getElementById('info-modal-ok-btn'),
+
+            // New elements for Edit Expense Modal
+            editExpenseModal: document.getElementById('edit-expense-modal'),
+            editExpenseId: document.getElementById('edit-expense-id'),
+            editExpenseDate: document.getElementById('edit-expense-date'),
+            editExpenseAmount: document.getElementById('edit-expense-amount'),
+            editExpenseGroupSelect: document.getElementById('edit-expense-group-select'),
+            editExpenseCategorySelect: document.getElementById('edit-expense-category-select'),
+            editExpensePayerSelect: document.getElementById('edit-expense-payer-select'),
+            editExpensePaymentModeSelect: document.getElementById('edit-expense-payment-mode-select'),
+            editExpenseDescription: document.getElementById('edit-expense-description'),
+            editExpenseSaveBtn: document.getElementById('edit-expense-save-btn'),
+            editExpenseCancelBtn: document.getElementById('edit-expense-cancel-btn'),
         };
 
         // Callbacks for modal actions
         this.currentRenameCallback = null;
         this.currentDeleteCallback = null;
+        this.currentEditExpenseCallback = null; // New callback for edit expense
 
         this._setupEventListeners();
     }
@@ -88,6 +102,35 @@ export class UIManager { // Added 'export' keyword here
         this.elements.deleteCancelBtn.addEventListener('click', () => this.hideDeleteModal());
 
         this.elements.infoModalOkBtn.addEventListener('click', () => this.hideInfoModal());
+
+        // Edit Expense Modal listeners
+        this.elements.editExpenseSaveBtn.addEventListener('click', () => {
+            if (this.currentEditExpenseCallback) {
+                const updatedExpenseData = {
+                    id: parseInt(this.elements.editExpenseId.value),
+                    date: this.elements.editExpenseDate.value,
+                    amount: parseFloat(this.elements.editExpenseAmount.value),
+                    expense_group_id: parseInt(this.elements.editExpenseGroupSelect.value),
+                    expense_category_id: parseInt(this.elements.editExpenseCategorySelect.value),
+                    payer_id: parseInt(this.elements.editExpensePayerSelect.value),
+                    payment_mode_id: parseInt(this.elements.editExpensePaymentModeSelect.value),
+                    expense_description: this.elements.editExpenseDescription.value.trim(),
+                };
+
+                // Basic client-side validation for edit modal
+                if (!updatedExpenseData.date || isNaN(updatedExpenseData.amount) || updatedExpenseData.amount <= 0 ||
+                    isNaN(updatedExpenseData.expense_group_id) || isNaN(updatedExpenseData.expense_category_id) ||
+                    isNaN(updatedExpenseData.payer_id) || isNaN(updatedExpenseData.payment_mode_id)) {
+                    this.showInfoModal('Validation Error', 'Please fill in all required fields correctly (Date, Amount, Group, Category, Payer, Payment Mode) in the edit form.');
+                    return;
+                }
+
+                this.currentEditExpenseCallback(updatedExpenseData);
+            }
+            this.hideEditExpenseModal();
+        });
+        this.elements.editExpenseCancelBtn.addEventListener('click', () => this.hideEditExpenseModal());
+
 
         // Set today's date as default for expense date input
         this.elements.expenseDate.valueAsDate = new Date();
@@ -128,6 +171,13 @@ export class UIManager { // Added 'export' keyword here
      * @type {function(Object): Promise<void>}
      */
     onAddExpense = () => {};
+
+    /**
+     * Callback function for editing an expense.
+     * @type {function(Object): Promise<void>}
+     */
+    onEditExpense = () => {}; // New callback for editing expense
+
 
     /**
      * Attaches add button listeners. This is called by the App class
@@ -291,6 +341,41 @@ export class UIManager { // Added 'export' keyword here
     }
 
     /**
+     * Shows the edit expense modal and populates it with existing data.
+     * @param {Object} expense - The expense object to edit.
+     * @param {Object} masterData - Object containing groups, categories, payers, payment modes for dropdowns.
+     * @param {function(Object): void} onSave - Callback function when save is clicked.
+     */
+    showEditExpenseModal(expense, masterData, onSave) {
+        this.elements.editExpenseId.value = expense.id;
+        this.elements.editExpenseDate.value = expense.date;
+        this.elements.editExpenseAmount.value = expense.amount;
+        this.elements.editExpenseDescription.value = expense.expense_description;
+
+        this.populateDropdown(this.elements.editExpenseGroupSelect, masterData.groups, 'Select Group');
+        this.elements.editExpenseGroupSelect.value = expense.expense_group_id;
+
+        this.populateDropdown(this.elements.editExpenseCategorySelect, masterData.categories, 'Select Category');
+        this.elements.editExpenseCategorySelect.value = expense.expense_category_id;
+
+        this.populateDropdown(this.elements.editExpensePayerSelect, masterData.payers, 'Select Payer');
+        this.elements.editExpensePayerSelect.value = expense.payer_id;
+
+        this.populateDropdown(this.elements.editExpensePaymentModeSelect, masterData.paymentModes, 'Select Payment Mode');
+        this.elements.editExpensePaymentModeSelect.value = expense.payment_mode_id;
+
+        this.currentEditExpenseCallback = onSave;
+        this.elements.editExpenseModal.classList.remove('hidden');
+    }
+
+    /** Hides the edit expense modal. */
+    hideEditExpenseModal() {
+        this.elements.editExpenseModal.classList.add('hidden');
+        this.currentEditExpenseCallback = null;
+    }
+
+
+    /**
      * Renders a list of entities (groups, categories, etc.) into a specified container.
      * @param {Array<Object>} entityArray - The array of entities to render.
      * @param {HTMLElement} containerElement - The DOM element to render into.
@@ -350,9 +435,10 @@ export class UIManager { // Added 'export' keyword here
     /**
      * Renders the list of all expenses.
      * @param {Array<Object>} expenses - The array of expense objects from the API.
+     * @param {function(Object): Promise<void>} onEdit - Callback for edit action.
      * @param {function(number): Promise<void>} onDelete - Callback for delete action.
      */
-    renderExpenses(expenses, onDelete) {
+    renderExpenses(expenses, onEdit, onDelete) {
         const containerElement = this.elements.expensesList;
         containerElement.innerHTML = ''; // Clear existing list
 
@@ -376,13 +462,31 @@ export class UIManager { // Added 'export' keyword here
                     </p>
                     ${exp.expense_description ? `<p class="text-sm text-gray-600 mt-1">"${exp.expense_description}"</p>` : ''}
                 </div>
-                <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transition duration-300 ease-in-out" data-id="${exp.id}" title="Delete Expense">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
-                    </svg>
-                </button>
+                <div class="flex gap-2">
+                    <button class="edit-expense-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transition duration-300 ease-in-out" data-id="${exp.id}" title="Edit Expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
+                        </svg>
+                    </button>
+                    <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transition duration-300 ease-in-out" data-id="${exp.id}" title="Delete Expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
             `;
             containerElement.appendChild(expenseDiv);
+        });
+
+        // Event listeners for edit and delete buttons on expenses
+        containerElement.querySelectorAll('.edit-expense-btn').forEach(button => {
+            button.addEventListener('click', (e) => {
+                const id = parseInt(e.currentTarget.dataset.id);
+                const expenseToEdit = expenses.find(exp => exp.id === id);
+                if (expenseToEdit) {
+                    onEdit(expenseToEdit); // Pass the entire expense object to the handler
+                }
+            });
         });
 
         containerElement.querySelectorAll('.delete-expense-btn').forEach(button => {
@@ -416,9 +520,17 @@ export class UIManager { // Added 'export' keyword here
      * @param {Object} data - Object containing arrays of groups, categories, payers, payment modes.
      */
     populateAllDropdowns(data) {
+        // For the Add Expense form
         this.populateDropdown(this.elements.expenseGroupSelect, data.groups, 'Select Group');
         this.populateDropdown(this.elements.expenseCategorySelect, data.categories, 'Select Category');
         this.populateDropdown(this.elements.expensePayerSelect, data.payers, 'Select Payer');
         this.populateDropdown(this.elements.expensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
+
+        // For the Edit Expense modal
+        // These will be populated again by showEditExpenseModal, but it's good to ensure they are available
+        this.populateDropdown(this.elements.editExpenseGroupSelect, data.groups, 'Select Group');
+        this.populateDropdown(this.elements.editExpenseCategorySelect, data.categories, 'Select Category');
+        this.populateDropdown(this.elements.editExpensePayerSelect, data.payers, 'Select Payer');
+        this.populateDropdown(this.elements.editExpensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
     }
 }

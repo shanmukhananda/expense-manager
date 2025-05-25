@@ -17,6 +17,7 @@ class App {
         this.ui.onAddPayer = this.handleAddPayer.bind(this);
         this.ui.onAddPaymentMode = this.handleAddPaymentMode.bind(this);
         this.ui.onAddExpense = this.handleAddExpense.bind(this);
+        this.ui.onEditExpense = this.handleEditExpense.bind(this); // New binding for edit expense
 
         // Attach add button listeners after callbacks are bound
         this.ui.attachAddButtonListeners();
@@ -107,7 +108,8 @@ class App {
                     break;
                 case 'tab-expenses':
                     await this.fetchAllData(); // Re-fetch all master data for dropdowns and expenses
-                    this.ui.renderExpenses(this.expenses, this.handleDeleteExpense.bind(this));
+                    // Pass handleEditExpense as the second callback
+                    this.ui.renderExpenses(this.expenses, this.handleEditExpense.bind(this), this.handleDeleteExpense.bind(this));
                     break;
             }
         } catch (error) {
@@ -199,6 +201,24 @@ class App {
         }
     }
 
+    // --- Handlers for Edit Expense Operation ---
+    async handleEditExpense(expenseToEdit) {
+        // Show the edit modal and pass the expense data and a callback for saving
+        this.ui.showEditExpenseModal(expenseToEdit, {
+            groups: this.groups,
+            categories: this.categories,
+            payers: this.payers,
+            paymentModes: this.paymentModes
+        }, async (updatedExpenseData) => {
+            try {
+                await this.api.updateExpense(updatedExpenseData.id, updatedExpenseData);
+                await this.handleTabChange('tab-expenses'); // Re-render expenses after update
+            } catch (error) {
+                this.ui.showInfoModal('Edit Error', `Failed to update expense: ${error.message}`);
+            }
+        });
+    }
+
     // --- Handlers for Delete Operations ---
     async handleDeleteGroup(id) {
         try {
@@ -222,7 +242,8 @@ class App {
         try {
             await this.api.deletePayer(id);
             await this.handleTabChange('tab-payers');
-        } catch (error) {
+        }
+        catch (error) {
             this.ui.showInfoModal('Delete Error', `Failed to delete payer: ${error.message}`);
         }
     }

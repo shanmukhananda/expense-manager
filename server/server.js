@@ -279,7 +279,8 @@ app.get('/api/payment-modes', async (req, res) => {
     try {
         const paymentModes = await runQuery('SELECT * FROM PaymentMode');
         res.json(paymentModes);
-    } catch (err) {
+    }
+    catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
@@ -391,6 +392,34 @@ app.post('/api/expenses', async (req, res) => {
         }
     }
 });
+
+app.put('/api/expenses/:id', async (req, res) => {
+    const { id } = req.params;
+    const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = req.body;
+
+    if (!expense_group_id || !expense_category_id || !payer_id || !payment_mode_id || !date || amount === undefined || amount === null) {
+        return res.status(400).json({ error: 'All required expense fields must be provided for update.' });
+    }
+
+    try {
+        const result = await runCommand(
+            'UPDATE Expenses SET expense_group_id = ?, expense_category_id = ?, payer_id = ?, payment_mode_id = ?, date = ?, amount = ?, expense_description = ? WHERE id = ?',
+            [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description, id]
+        );
+
+        if (result.changes === 0) {
+            return res.status(404).json({ error: 'Expense not found or no changes made.' });
+        }
+        res.json({ id: parseInt(id), ...req.body });
+    } catch (err) {
+        if (err.message.includes('FOREIGN KEY constraint failed')) {
+            res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided for update.' });
+        } else {
+            res.status(500).json({ error: err.message });
+        }
+    }
+});
+
 
 app.delete('/api/expenses/:id', async (req, res) => {
     const { id } = req.params;

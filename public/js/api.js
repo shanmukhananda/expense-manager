@@ -183,6 +183,16 @@ export class ApiService { // Added 'export' keyword here
         return this.post('/expenses', expenseData);
     }
 
+    /**
+     * Updates an existing expense.
+     * @param {number} id - The ID of the expense to update.
+     * @param {Object} expenseData - The updated expense data.
+     * @returns {Promise<Object>} Promise resolving to the updated expense.
+     */
+    async updateExpense(id, expenseData) {
+        return this.put(`/expenses/${id}`, expenseData);
+    }
+
     async deleteExpense(id) {
         return this.delete(`/expenses/${id}`);
     }
