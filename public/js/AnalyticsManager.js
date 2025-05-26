@@ -20,8 +20,6 @@ export class AnalyticsManager {
             categorySelect: null,
             paymentModeSelect: null,
             applyFiltersBtn: null,
-            // Results elements (if specific ones are needed beyond just clearing the container)
-            // e.g., analyticsTotalAmountText, analyticsTotalCountText, analyticsCategoryResultsTableBody
         }; 
     }
 
@@ -87,10 +85,8 @@ export class AnalyticsManager {
 
         this.filtersContainer.innerHTML = filtersHTML;
 
-        // Cache the newly created elements by calling the internal caching method
         this._cacheFilterElements();
 
-        // Set default end date to today and start date to first day of current month
         if (this.elements.endDateInput && this.elements.startDateInput) {
             const today = new Date();
             const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
@@ -98,7 +94,6 @@ export class AnalyticsManager {
             this.elements.startDateInput.valueAsDate = firstDayOfMonth;
         }
 
-        // Add event listeners
         if (this.elements.applyFiltersBtn) {
              this.elements.applyFiltersBtn.addEventListener('click', applyFiltersCallback);
         }
@@ -118,14 +113,14 @@ export class AnalyticsManager {
         if (this.elements.categorySelect) {
             categoryIds = Array.from(this.elements.categorySelect.selectedOptions)
                 .map(opt => opt.value)
-                .filter(val => val !== ""); // Filter out the "All Categories" option if it has value ""
+                .filter(val => val !== ""); 
         }
 
         let paymentModeIds = [];
         if (this.elements.paymentModeSelect) {
             paymentModeIds = Array.from(this.elements.paymentModeSelect.selectedOptions)
                 .map(opt => opt.value)
-                .filter(val => val !== ""); // Filter out the "All Payment Modes" option
+                .filter(val => val !== ""); 
         }
 
         return {
@@ -139,69 +134,64 @@ export class AnalyticsManager {
     renderAnalyticsResults(analyticsData) {
         this.resultsContainer.innerHTML = ''; // Clear previous results
 
-        if (!analyticsData || analyticsData.totalFilteredCount === 0) {
-            this.resultsContainer.innerHTML = `
-                <div class="bg-white p-6 rounded-lg shadow text-center">
-                    <p class="text-gray-600 text-lg">No data matches your current filter selection.</p>
-                    <p class="text-gray-500 text-sm">Try adjusting the date range or selecting different categories/payment modes.</p>
-                </div>
-            `;
+        if (!analyticsData) {
+            this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Analytics data is currently unavailable.</p>';
             return;
         }
 
-        const resultsHTML = `
-            <div class="bg-white p-6 rounded-lg shadow mb-6">
-                <h3 class="text-xl font-semibold text-gray-800 mb-4">Overall Summary</h3>
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                        <p class="text-sm text-gray-600">Total Expenses (Filtered):</p>
-                        <p class="text-2xl font-bold text-blue-600">${analyticsData.overallTotal.toFixed(2)}</p>
-                    </div>
-                    <div>
-                        <p class="text-sm text-gray-600">Number of Transactions:</p>
-                        <p class="text-2xl font-bold text-blue-600">${analyticsData.totalFilteredCount}</p>
-                    </div>
-                </div>
-            </div>
+        const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
+        const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
 
-            <div class="bg-white p-6 rounded-lg shadow">
-                <h3 class="text-xl font-semibold text-gray-800 mb-4">Category Breakdown</h3>
+        if (totalFilteredCount === 0 && (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0)) {
+            this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No expenses match the selected filters.</p>';
+            return;
+        }
+
+        let resultsHTML = `
+            <div class="mb-6 p-4 bg-white shadow rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
+                <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
+            </div>
+        `;
+
+        if (analyticsData.categoryBreakdown && analyticsData.categoryBreakdown.length > 0) {
+            resultsHTML += `
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">Category Breakdown</h4>
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
+                    <table class="min-w-full divide-y divide-gray-200 border border-gray-200 shadow-sm rounded-lg">
+                        <thead class="bg-gray-100">
                             <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Total Amount</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">Percentage</th>
+                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Category</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Total Amount</th>
+                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Percentage</th>
                             </tr>
                         </thead>
-                        <tbody id="analytics-category-tbody" class="bg-white divide-y divide-gray-200">
-                            <!-- Rows will be injected here by JavaScript -->
+                        <tbody class="bg-white divide-y divide-gray-200">
+            `;
+
+            analyticsData.categoryBreakdown.forEach(item => {
+                const categoryName = item.categoryName || 'Unnamed Category';
+                const itemTotalAmountDisplay = (parseFloat(item.totalAmount) || 0).toFixed(2);
+                const itemPercentageDisplay = (parseFloat(item.percentage) || 0).toFixed(2);
+                resultsHTML += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${categoryName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemTotalAmountDisplay}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemPercentageDisplay}%</td>
+                    </tr>
+                `;
+            });
+
+            resultsHTML += `
                         </tbody>
                     </table>
                 </div>
-            </div>
-        `;
-        this.resultsContainer.innerHTML = resultsHTML;
-
-        const tableBody = this.resultsContainer.querySelector('#analytics-category-tbody'); // Query within resultsContainer
-        if (tableBody) {
-            if (analyticsData.categoryBreakdown && analyticsData.categoryBreakdown.length > 0) {
-                analyticsData.categoryBreakdown.forEach(item => {
-                    const row = tableBody.insertRow();
-                    row.innerHTML = `
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${item.categoryName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${item.totalAmount.toFixed(2)}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${item.percentage.toFixed(2)}%</td>
-                    `;
-                });
-            } else if (analyticsData.overallTotal > 0) {
-                 const row = tableBody.insertRow();
-                 row.innerHTML = `<td colspan="3" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No category-specific data to display, but there are overall expenses.</td>`;
-            } else {
-                 const row = tableBody.insertRow();
-                 row.innerHTML = `<td colspan="3" class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">No category breakdown available.</td>`;
-            }
+            `;
+        } else if (totalFilteredCount > 0) { 
+             resultsHTML += '<p class="text-gray-500 text-center py-4">No category-specific data to display for the selection.</p>';
         }
+        
+        this.resultsContainer.innerHTML = resultsHTML;
     }
 }
