@@ -1,5 +1,5 @@
-// server/repositories/BaseRepository.js
-class BaseRepository {
+// server/repositories/AuxDataRepository.js
+class AuxDataRepository {
     constructor(dbManager, tableName, fkColumnName = null) {
         this.dbManager = dbManager;
         this.tableName = tableName;
@@ -73,4 +73,4 @@ class BaseRepository {
     }
 }
 
-module.exports = BaseRepository;
+module.exports = AuxDataRepository;
