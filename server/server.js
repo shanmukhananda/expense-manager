@@ -66,6 +66,7 @@ class ExpenseManagerServer {
         this.app.post('/api/expenses', this._handleAddExpense.bind(this));
         this.app.put('/api/expenses/:id', this._handleUpdateExpense.bind(this));
         this.app.delete('/api/expenses/:id', this._handleDeleteExpense.bind(this));
+        this.app.get('/api/expenses/analytics', this._handleGetAnalyticsData.bind(this));
     }
 
     /**
@@ -216,6 +217,16 @@ class ExpenseManagerServer {
                 res.status(500).json({ error: err.message });
             }
         }
+    }
+
+    async _handleGetAnalyticsData(req, res) {
+        const { startDate, endDate, categoryIds, paymentModeIds } = req.query;
+        console.log('Analytics filters received:', { startDate, endDate, categoryIds, paymentModeIds });
+        // Placeholder: Actual data fetching will be implemented in ExpenseRepository
+        res.json({
+            message: "Analytics endpoint is active. Filtering logic pending.",
+            filters: { startDate, endDate, categoryIds, paymentModeIds }
+        });
     }
 
     /**

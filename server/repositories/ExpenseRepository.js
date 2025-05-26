@@ -88,6 +88,98 @@ class ExpenseRepository {
             throw new Error('Expense not found.');
         }
     }
+
+    async getAnalyticsData(filters = {}) {
+        let overallTotal = 0;
+        let totalFilteredCount = 0;
+        const categoryBreakdown = [];
+        const categoryTotals = {};
+        const categoryNames = {};
+
+        let sql = `
+            SELECT
+                e.amount,
+                ec.id AS category_id,
+                ec.name AS category_name
+            FROM Expenses e
+            JOIN ExpenseCategories ec ON e.expense_category_id = ec.id
+        `;
+
+        const params = [];
+        const whereClauses = [];
+
+        // Date filters
+        if (filters.startDate && filters.endDate) {
+            whereClauses.push('e.date BETWEEN ? AND ?');
+            params.push(filters.startDate, filters.endDate);
+        } else if (filters.startDate) {
+            whereClauses.push('e.date >= ?');
+            params.push(filters.startDate);
+        } else if (filters.endDate) {
+            whereClauses.push('e.date <= ?');
+            params.push(filters.endDate);
+        }
+
+        // Category ID filters
+        let categoryIds = filters.categoryIds;
+        if (categoryIds) {
+            if (typeof categoryIds === 'string') {
+                categoryIds = categoryIds.trim() === '' ? [] : categoryIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
+            }
+            if (Array.isArray(categoryIds) && categoryIds.length > 0) {
+                whereClauses.push(`e.expense_category_id IN (${categoryIds.map(() => '?').join(',')})`);
+                params.push(...categoryIds);
+            }
+        }
+        
+        // Payment Mode ID filters
+        let paymentModeIds = filters.paymentModeIds;
+        if (paymentModeIds) {
+            if (typeof paymentModeIds === 'string') {
+                paymentModeIds = paymentModeIds.trim() === '' ? [] : paymentModeIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
+            }
+            if (Array.isArray(paymentModeIds) && paymentModeIds.length > 0) {
+                whereClauses.push(`e.payment_mode_id IN (${paymentModeIds.map(() => '?').join(',')})`);
+                params.push(...paymentModeIds);
+            }
+        }
+
+        if (whereClauses.length > 0) {
+            sql += ' WHERE ' + whereClauses.join(' AND ');
+        }
+
+        const rows = await this.dbManager.runQuery(sql, params);
+
+        if (rows && rows.length > 0) {
+            totalFilteredCount = rows.length; // Set count based on returned rows
+            rows.forEach(row => {
+                overallTotal += row.amount;
+                categoryTotals[row.category_id] = (categoryTotals[row.category_id] || 0) + row.amount;
+                if (!categoryNames[row.category_id]) { 
+                    categoryNames[row.category_id] = row.category_name;
+                }
+            });
+        }
+
+        for (const categoryId in categoryTotals) {
+            const totalAmount = categoryTotals[categoryId];
+            const percentage = overallTotal === 0 ? 0 : (totalAmount / overallTotal) * 100;
+            categoryBreakdown.push({
+                categoryId: parseInt(categoryId),
+                categoryName: categoryNames[categoryId],
+                totalAmount: parseFloat(totalAmount.toFixed(2)),
+                percentage: parseFloat(percentage.toFixed(2))
+            });
+        }
+        
+        categoryBreakdown.sort((a, b) => b.totalAmount - a.totalAmount);
+
+        return {
+            overallTotal: parseFloat(overallTotal.toFixed(2)),
+            totalFilteredCount,
+            categoryBreakdown
+        };
+    }
 }
 
 module.exports = ExpenseRepository;

@@ -40,6 +40,7 @@
             <button id="tab-payers" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">Payers</button>
             <button id="tab-payment-modes" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">Payment Modes</button>
             <button id="tab-expenses" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">Expenses</button>
+            <button id="tab-analytics" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75">Analytics</button>
         </div>
 
         <div id="content-groups" class="tab-content">
@@ -132,6 +133,20 @@
             <div id="expenses-list" class="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-96 overflow-y-auto">
                 </div>
         </div>
+
+        <div id="content-analytics" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-4">Analytics Dashboard</h2>
+            <div id="analytics-filters-container" class="bg-gray-50 p-6 rounded-lg border border-gray-200 mb-6">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Filters</h3>
+                <!-- Filter controls will go here -->
+                <p class="text-gray-500">Filter controls will be added here.</p>
+            </div>
+            <div id="analytics-results-container" class="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Results</h3>
+                <!-- Analytics results will be displayed here -->
+                <p class="text-gray-500">Analytics results will be displayed here.</p>
+            </div>
+        </div>
     </div>
 
     <div id="rename-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center p-4 hidden">
@@ -215,6 +230,7 @@
         </div>
     </div>
 
+    <script type="module" src="js/analyticsManager.js"></script>
     <script type="module" src="js/app.js"></script>
 </body>
 </html>
