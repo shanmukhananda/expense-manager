@@ -106,8 +106,8 @@ class ExpenseManagerServer {
             const newEntity = await repository.add(name);
             res.status(201).json(newEntity);
         } catch (err) {
-            if (err.message.includes('UNIQUE constraint failed')) {
-                res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` });
+        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) { // Fallback for safety
+            res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` }); // Consider singularizing tableName more robustly
             } else {
                 res.status(500).json({ error: err.message });
             }
@@ -127,10 +127,10 @@ class ExpenseManagerServer {
             const updatedEntity = await repository.update(id, name);
             res.json(updatedEntity);
         } catch (err) {
-            if (err.message.includes('not found or no changes made')) {
+        if (err.message && err.message.includes('not found or no changes made')) { // Custom error from repository
                 res.status(404).json({ error: err.message });
-            } else if (err.message.includes('UNIQUE constraint failed')) {
-                res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` });
+        } else if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) {
+            res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` }); // Consider singularizing tableName
             } else {
                 res.status(500).json({ error: err.message });
             }
@@ -146,9 +146,9 @@ class ExpenseManagerServer {
             await repository.delete(id);
             res.status(204).send(); // No content for successful deletion
         } catch (err) {
-            if (err.message.includes('not found')) {
+            if (err.message && err.message.includes('not found')) { // Custom error from repository
                 res.status(404).json({ error: err.message });
-            } else if (err.message.includes('associated with existing expenses')) {
+            } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed')) || (err.message && err.message.includes('associated with existing expenses'))) { // More robust check
                 res.status(400).json({ error: err.message });
             } else {
                 res.status(500).json({ error: err.message });
@@ -176,8 +176,8 @@ class ExpenseManagerServer {
             const newExpense = await this.expenseRepository.addExpense(expenseData);
             res.status(201).json(newExpense);
         } catch (err) {
-            if (err.message.includes('FOREIGN KEY constraint failed')) {
-                res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided.' });
+            if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed'))) {
+                res.status(400).json({ error: 'Invalid ID provided for group, category, payer, or payment mode.' });
             } else {
                 res.status(500).json({ error: err.message });
             }
@@ -194,10 +194,10 @@ class ExpenseManagerServer {
             const updatedExpense = await this.expenseRepository.updateExpense(id, expenseData);
             res.json(updatedExpense);
         } catch (err) {
-            if (err.message.includes('not found or no changes made')) {
+            if (err.message && err.message.includes('not found or no changes made')) { // Custom error from repository
                 res.status(404).json({ error: err.message });
-            } else if (err.message.includes('FOREIGN KEY constraint failed')) {
-                res.status(400).json({ error: 'Invalid group, category, payer, or payment mode ID provided for update.' });
+            } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed'))) {
+                res.status(400).json({ error: 'Invalid ID provided for group, category, payer, or payment mode during update.' });
             } else {
                 res.status(500).json({ error: err.message });
             }
