@@ -76,6 +76,11 @@ export class UIManager {
             editExpenseDescription: document.getElementById('edit-expense-description'),
             editExpenseSaveBtn: document.getElementById('edit-expense-save-btn'),
             editExpenseCancelBtn: document.getElementById('edit-expense-cancel-btn'),
+
+            // Analytics Tab Elements
+            contentAnalytics: document.getElementById('content-analytics'),
+            analyticsFiltersContainer: document.getElementById('analytics-filters-container'),
+            analyticsResultsContainer: document.getElementById('analytics-results-container'),
         };
     }
 

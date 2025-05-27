@@ -1,6 +1,7 @@
 // public/js/app.js
 import { ApiService } from './api.js';
 import { UIManager } from './ui.js';
+import { AnalyticsManager } from './AnalyticsManager.js';
 
 /**
  * Main application class to manage state and orchestrate interactions.
@@ -11,6 +12,11 @@ class App {
     constructor() {
         this.api = new ApiService();
         this.ui = new UIManager();
+        this.analyticsManager = new AnalyticsManager(
+            this.ui, 
+            this.ui.elements.analyticsFiltersContainer, 
+            this.ui.elements.analyticsResultsContainer
+        );
 
         this._bindEventHandlers();
         this.ui.attachAddButtonListeners(); // Attach listeners after binding callbacks
@@ -108,10 +114,30 @@ class App {
                     await this._fetchAllData(); // Re-fetch all master data for dropdowns and expenses
                     this._renderExpenses();
                     break;
+                case 'tab-analytics':
+                    if (!this.categories || this.categories.length === 0 || !this.paymentModes || this.paymentModes.length === 0) {
+                        await this._fetchAllData(); 
+                    }
+                    this.analyticsManager.renderAnalyticsFilters({ categories: this.categories, paymentModes: this.paymentModes }, this._handleApplyAnalyticsFilters.bind(this));
+                    this.analyticsManager.renderAnalyticsResults(null); // Clear previous results
+                    break;
             }
         } catch (error) {
             console.error(`Error loading tab ${tabId}:`, error);
             this.ui.showInfoModal('Load Error', `Failed to load ${tabId.replace('tab-', '')} data: ${error.message}`);
+        }
+    }
+
+    async _handleApplyAnalyticsFilters() {
+        try {
+            const filters = this.analyticsManager.getAnalyticsFilterValues();
+            console.log('Applying analytics filters:', filters);
+            const analyticsData = await this.api.getAnalytics(filters);
+            console.log('Analytics data received:', analyticsData);
+            this.analyticsManager.renderAnalyticsResults(analyticsData);
+        } catch (error) {
+            console.error('Error applying analytics filters:', error);
+            this.ui.showInfoModal('Analytics Error', `Failed to load analytics data: ${error.message}`);
         }
     }
 

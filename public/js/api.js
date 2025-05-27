@@ -197,4 +197,22 @@ export class ApiService {
     async deleteExpense(id) {
         return this.delete(`/expenses/${id}`);
     }
+
+    async getAnalytics(filters = {}) {
+        const queryParams = new URLSearchParams();
+        if (filters.startDate) {
+            queryParams.append('startDate', filters.startDate);
+        }
+        if (filters.endDate) {
+            queryParams.append('endDate', filters.endDate);
+        }
+        if (filters.categoryIds && Array.isArray(filters.categoryIds) && filters.categoryIds.length > 0) {
+            queryParams.append('categoryIds', filters.categoryIds.join(','));
+        }
+        if (filters.paymentModeIds && Array.isArray(filters.paymentModeIds) && filters.paymentModeIds.length > 0) {
+            queryParams.append('paymentModeIds', filters.paymentModeIds.join(','));
+        }
+        const queryString = queryParams.toString();
+        return this.get(`/expenses/analytics${queryString ? '?' + queryString : ''}`);
+    }
 }

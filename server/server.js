@@ -66,6 +66,7 @@ class ExpenseManagerServer {
         this.app.post('/api/expenses', this._handleAddExpense.bind(this));
         this.app.put('/api/expenses/:id', this._handleUpdateExpense.bind(this));
         this.app.delete('/api/expenses/:id', this._handleDeleteExpense.bind(this));
+        this.app.get('/api/expenses/analytics', this._handleGetAnalyticsData.bind(this));
     }
 
     /**
@@ -215,6 +216,21 @@ class ExpenseManagerServer {
             } else {
                 res.status(500).json({ error: err.message });
             }
+        }
+    }
+
+    async _handleGetAnalyticsData(req, res) {
+        try {
+            // req.query contains the filter parameters from the frontend
+            // These are already strings, including comma-separated strings for IDs
+            const filters = req.query; 
+            console.log('Analytics filters received by server handler:', filters); // Log received filters
+            
+            const analyticsData = await this.expenseRepository.getAnalyticsData(filters);
+            res.json(analyticsData);
+        } catch (err) {
+            console.error('Error fetching analytics data:', err.message);
+            res.status(500).json({ error: `Failed to retrieve analytics data: ${err.message}` });
         }
     }
 
