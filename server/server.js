@@ -224,7 +224,6 @@ class ExpenseManagerServer {
             // req.query contains the filter parameters from the frontend
             // These are already strings, including comma-separated strings for IDs
             const filters = req.query; 
-            console.log('Analytics filters received by server handler:', filters); // Log received filters
             
             const analyticsData = await this.expenseRepository.getAnalyticsData(filters);
             res.json(analyticsData);
@@ -259,7 +258,6 @@ class ExpenseManagerServer {
             });
         } catch (err) {
             console.error('Failed to start server due to database error:', err);
-            // Exit process or handle more gracefully in a real application
             process.exit(1);
         }
     }

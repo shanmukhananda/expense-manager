@@ -136,9 +136,7 @@ class App {
     async _handleApplyAnalyticsFilters() {
         try {
             const filters = this.analyticsManager.getAnalyticsFilterValues();
-            console.log('Applying analytics filters:', filters);
             const analyticsData = await this.api.getAnalytics(filters);
-            console.log('Analytics data received:', analyticsData);
             this.analyticsManager.renderAnalyticsResults(analyticsData);
         } catch (error) {
             console.error('Error applying analytics filters:', error);
