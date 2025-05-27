@@ -212,6 +212,12 @@ export class ApiService {
         if (filters.paymentModeIds && Array.isArray(filters.paymentModeIds) && filters.paymentModeIds.length > 0) {
             queryParams.append('paymentModeIds', filters.paymentModeIds.join(','));
         }
+        if (filters.groupIds && Array.isArray(filters.groupIds) && filters.groupIds.length > 0) {
+            queryParams.append('groupIds', filters.groupIds.join(','));
+        }
+        if (filters.payerIds && Array.isArray(filters.payerIds) && filters.payerIds.length > 0) {
+            queryParams.append('payerIds', filters.payerIds.join(','));
+        }
         const queryString = queryParams.toString();
         return this.get(`/expenses/analytics${queryString ? '?' + queryString : ''}`);
     }

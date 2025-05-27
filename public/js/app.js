@@ -115,10 +115,15 @@ class App {
                     this._renderExpenses();
                     break;
                 case 'tab-analytics':
-                    if (!this.categories || this.categories.length === 0 || !this.paymentModes || this.paymentModes.length === 0) {
+                    if (!this.categories || this.categories.length === 0 || !this.paymentModes || this.paymentModes.length === 0 || !this.groups || this.groups.length === 0 || !this.payers || this.payers.length === 0) {
                         await this._fetchAllData(); 
                     }
-                    this.analyticsManager.renderAnalyticsFilters({ categories: this.categories, paymentModes: this.paymentModes }, this._handleApplyAnalyticsFilters.bind(this));
+                    this.analyticsManager.renderAnalyticsFilters({
+                        categories: this.categories,
+                        paymentModes: this.paymentModes,
+                        groups: this.groups,
+                        payers: this.payers
+                    }, this._handleApplyAnalyticsFilters.bind(this));
                     this.analyticsManager.renderAnalyticsResults(null); // Clear previous results
                     break;
             }
@@ -131,9 +136,7 @@ class App {
     async _handleApplyAnalyticsFilters() {
         try {
             const filters = this.analyticsManager.getAnalyticsFilterValues();
-            console.log('Applying analytics filters:', filters);
             const analyticsData = await this.api.getAnalytics(filters);
-            console.log('Analytics data received:', analyticsData);
             this.analyticsManager.renderAnalyticsResults(analyticsData);
         } catch (error) {
             console.error('Error applying analytics filters:', error);

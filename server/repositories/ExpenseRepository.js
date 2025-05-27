@@ -144,6 +144,30 @@ class ExpenseRepository {
             }
         }
 
+        // Group ID filters
+        let groupIds = filters.groupIds;
+        if (groupIds) {
+            if (typeof groupIds === 'string') {
+                groupIds = groupIds.trim() === '' ? [] : groupIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
+            }
+            if (Array.isArray(groupIds) && groupIds.length > 0) {
+                whereClauses.push(`e.expense_group_id IN (${groupIds.map(() => '?').join(',')})`);
+                params.push(...groupIds);
+            }
+        }
+
+        // Payer ID filters
+        let payerIds = filters.payerIds;
+        if (payerIds) {
+            if (typeof payerIds === 'string') {
+                payerIds = payerIds.trim() === '' ? [] : payerIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
+            }
+            if (Array.isArray(payerIds) && payerIds.length > 0) {
+                whereClauses.push(`e.payer_id IN (${payerIds.map(() => '?').join(',')})`);
+                params.push(...payerIds);
+            }
+        }
+
         if (whereClauses.length > 0) {
             sql += ' WHERE ' + whereClauses.join(' AND ');
         }
