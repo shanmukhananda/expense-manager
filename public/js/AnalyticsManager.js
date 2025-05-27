@@ -19,6 +19,8 @@ export class AnalyticsManager {
             allTimeBtn: null,
             categorySelect: null,
             paymentModeSelect: null,
+            groupSelect: null, // Added
+            payerSelect: null,   // Added
             applyFiltersBtn: null,
         }; 
     }
@@ -35,6 +37,8 @@ export class AnalyticsManager {
             this.elements.allTimeBtn = this.filtersContainer.querySelector('#analytics-all-time-btn');
             this.elements.categorySelect = this.filtersContainer.querySelector('#analytics-category-select');
             this.elements.paymentModeSelect = this.filtersContainer.querySelector('#analytics-payment-mode-select');
+            this.elements.groupSelect = this.filtersContainer.querySelector('#analytics-group-select'); // Added
+            this.elements.payerSelect = this.filtersContainer.querySelector('#analytics-payer-select');   // Added
             this.elements.applyFiltersBtn = this.filtersContainer.querySelector('#analytics-apply-filters-btn');
         }
     }
@@ -42,8 +46,9 @@ export class AnalyticsManager {
     renderAnalyticsFilters(masterData, applyFiltersCallback) {
         this.filtersContainer.innerHTML = ''; // Clear previous filters
 
+        // Adjusted grid to better accommodate more filters: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
         const filtersHTML = `
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
                 <!-- Date Range Section -->
                 <div class="bg-white p-4 rounded-lg shadow">
                     <h4 class="text-md font-semibold text-gray-700 mb-3">Date Range</h4>
@@ -75,6 +80,24 @@ export class AnalyticsManager {
                     <select id="analytics-payment-mode-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
                         <option value="">All Payment Modes</option>
                         ${masterData.paymentModes && masterData.paymentModes.map(pm => `<option value="${pm.id}">${pm.name}</option>`).join('')}
+                    </select>
+                </div>
+
+                <!-- Expense Group Filter Section -->
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
+                    <select id="analytics-group-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                        <option value="">All Groups</option>
+                        ${masterData.groups && masterData.groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('')}
+                    </select>
+                </div>
+
+                <!-- Payer Filter Section -->
+                <div class="bg-white p-4 rounded-lg shadow">
+                    <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
+                    <select id="analytics-payer-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                        <option value="">All Payers</option>
+                        ${masterData.payers && masterData.payers.map(payer => `<option value="${payer.id}">${payer.name}</option>`).join('')}
                     </select>
                 </div>
             </div>
@@ -123,11 +146,28 @@ export class AnalyticsManager {
                 .filter(val => val !== ""); 
         }
 
+        // Added for new filters
+        let groupIds = [];
+        if (this.elements.groupSelect) {
+            groupIds = Array.from(this.elements.groupSelect.selectedOptions)
+                .map(opt => opt.value)
+                .filter(val => val !== "");
+        }
+
+        let payerIds = [];
+        if (this.elements.payerSelect) {
+            payerIds = Array.from(this.elements.payerSelect.selectedOptions)
+                .map(opt => opt.value)
+                .filter(val => val !== "");
+        }
+
         return {
             startDate,
             endDate,
             categoryIds,
-            paymentModeIds
+            paymentModeIds,
+            groupIds, // Added
+            payerIds    // Added
         };
     }
 
