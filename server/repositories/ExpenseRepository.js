@@ -151,7 +151,7 @@ class ExpenseRepository {
         const rows = await this.dbManager.runQuery(sql, params);
 
         if (rows && rows.length > 0) {
-            totalFilteredCount = rows.length; // Set count based on returned rows
+            totalFilteredCount = rows.length; 
             rows.forEach(row => {
                 overallTotal += row.amount;
                 categoryTotals[row.category_id] = (categoryTotals[row.category_id] || 0) + row.amount;

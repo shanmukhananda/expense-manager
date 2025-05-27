@@ -220,13 +220,18 @@ class ExpenseManagerServer {
     }
 
     async _handleGetAnalyticsData(req, res) {
-        const { startDate, endDate, categoryIds, paymentModeIds } = req.query;
-        console.log('Analytics filters received:', { startDate, endDate, categoryIds, paymentModeIds });
-        // Placeholder: Actual data fetching will be implemented in ExpenseRepository
-        res.json({
-            message: "Analytics endpoint is active. Filtering logic pending.",
-            filters: { startDate, endDate, categoryIds, paymentModeIds }
-        });
+        try {
+            // req.query contains the filter parameters from the frontend
+            // These are already strings, including comma-separated strings for IDs
+            const filters = req.query; 
+            console.log('Analytics filters received by server handler:', filters); // Log received filters
+            
+            const analyticsData = await this.expenseRepository.getAnalyticsData(filters);
+            res.json(analyticsData);
+        } catch (err) {
+            console.error('Error fetching analytics data:', err.message);
+            res.status(500).json({ error: `Failed to retrieve analytics data: ${err.message}` });
+        }
     }
 
     /**
