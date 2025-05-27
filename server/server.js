@@ -2,11 +2,10 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const path = require('path');
-// Import the *instance* of DatabaseManager that is exported by database.js
-const dbManagerInstance = require('./database'); // This variable now holds the single instance
+const getDatabaseManager = require('./database'); // Import the factory function
 
-const AuxDataRepository = require('./repositories/AuxDataRepository');
-const ExpenseRepository = require('./repositories/ExpenseRepository');
+const AuxDataRepository = require('./repositories/aux-data-repository');
+const ExpenseRepository = require('./repositories/expense-repository');
 
 class ExpenseManagerServer {
     /**
@@ -263,7 +262,22 @@ class ExpenseManagerServer {
     }
 }
 
-// Instantiate and start the server using the imported dbManagerInstance
-const PORT = 3000;
-const server = new ExpenseManagerServer(dbManagerInstance, PORT);
-server.start();
+/**
+ * Initializes and starts the Expense Manager server.
+ */
+async function main() {
+    const dbManager = getDatabaseManager(); // Create a DatabaseManager instance
+    const PORT = 3000;
+
+    const server = new ExpenseManagerServer(dbManager, PORT);
+
+    try {
+        await server.start(); // server.start() itself handles db initialization and listening
+    } catch (error) {
+        // This catch is a fallback, server.start() has its own process.exit on critical failure
+        console.error('Critical error during server startup:', error);
+        process.exit(1);
+    }
+}
+
+main();

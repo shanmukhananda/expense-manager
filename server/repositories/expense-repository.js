@@ -1,4 +1,4 @@
-// server/repositories/ExpenseRepository.js
+// server/repositories/expense-repository.js
 class ExpenseRepository {
     constructor(dbManager) {
         this.dbManager = dbManager;

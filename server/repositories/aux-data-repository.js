@@ -1,4 +1,4 @@
-// server/repositories/AuxDataRepository.js
+// server/repositories/aux-data-repository.js
 class AuxDataRepository {
     constructor(dbManager, tableName, fkColumnName = null) {
         this.dbManager = dbManager;

@@ -1,7 +1,7 @@
 {
   "name": "expense-manager",
   "version": "1.0.0",
-  "description": "",
+  "description": "This is a full-stack web application designed to help you track and manage your personal expenses. It features a user-friendly interface for recording daily spending and organizing financial data.",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"

@@ -120,9 +120,14 @@ class DatabaseManager {
     }
 }
 
-// Export a single instance of the DatabaseManager
-const DB_PATH = path.resolve(__dirname, 'expense_manager.db');
-const SCHEMA_PATH = path.resolve(__dirname, '../schema.sql');
-const dbManager = new DatabaseManager(DB_PATH, SCHEMA_PATH);
+/**
+ * Creates and returns a new instance of the DatabaseManager.
+ * @returns {DatabaseManager} A new DatabaseManager instance.
+ */
+function getDatabaseManager() {
+    const DB_PATH = path.resolve(__dirname, '../expense-manager.db');
+    const SCHEMA_PATH = path.resolve(__dirname, '../schema.sql');
+    return new DatabaseManager(DB_PATH, SCHEMA_PATH);
+}
 
-module.exports = dbManager;
+module.exports = getDatabaseManager;
