@@ -126,7 +126,7 @@ class DatabaseManager {
  */
 function getDatabaseManager() {
     const DB_PATH = path.resolve(__dirname, '../expense-manager.db');
-    const SCHEMA_PATH = path.resolve(__dirname, '../schema.sql');
+    const SCHEMA_PATH = path.resolve(__dirname, './schema.sql'); // Changed path
     return new DatabaseManager(DB_PATH, SCHEMA_PATH);
 }
 
