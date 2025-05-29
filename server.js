@@ -15,15 +15,14 @@ async function main() {
         console.log('Incoming request:', req.method, req.path);
         next();
     });
-
-    // Initialize and use routes from the controller FIRST
-    // This ensures API routes are prioritized
-    const controller = new ExpenseManagerServerController(dbManager, app); 
-
     // Then Middleware setup
     const bodyParser = require('body-parser'); 
     app.use(bodyParser.json());
     app.use(express.static(path.join(__dirname, 'src'))); 
+
+    // Initialize and use routes from the controller FIRST
+    // This ensures API routes are prioritized
+    const controller = new ExpenseManagerServerController(dbManager, app); 
 
     // Then Serve index.html for the root path
     app.get('/', (req, res) => {
