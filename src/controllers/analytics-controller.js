@@ -1,4 +1,4 @@
-// public/js/analytics-manager.js
+// src/controllers/analytics-controller.js
 
 export class AnalyticsManager {
     /**

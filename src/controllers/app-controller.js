@@ -1,7 +1,8 @@
-// public/js/app.js
-import { ApiService } from './api.js';
-import { UIManager } from './ui.js';
-import { AnalyticsManager } from './analytics-manager.js';
+// src/controllers/app-controller.js
+
+import { ApiService } from '../services/api-service.js';
+import { UIManager } from '../views/ui.js';
+import { AnalyticsManager } from './analytics-controller.js';
 
 /**
  * Main application class to manage state and orchestrate interactions.
