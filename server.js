@@ -1,3 +1,4 @@
+console.log('--- SERVER.JS HAS BEEN MODIFIED BY JULES - TESTING FILE UPDATES ---');
 // server.js (root)
 const express = require('express');
 const path = require('path');
@@ -16,16 +17,16 @@ async function main() {
         next();
     });
 
-    // Initialize and use routes from the controller FIRST
+    // Middleware setup BEFORE controller
+    const bodyParser = require('body-parser'); 
+    app.use(bodyParser.json());
+
+    // Initialize and use routes from the controller
     // This ensures API routes are prioritized
     const controller = new ExpenseManagerServerController(dbManager, app); 
 
-    // Then Middleware setup
-    const bodyParser = require('body-parser'); 
-    app.use(bodyParser.json());
+    // Static files and root route
     app.use(express.static(path.join(__dirname, 'src'))); 
-
-    // Then Serve index.html for the root path
     app.get('/', (req, res) => {
         console.log('Serving index.html for /'); // Added for debugging
         res.sendFile(path.join(__dirname, 'src', 'views', 'index.html'));

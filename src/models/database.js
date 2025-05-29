@@ -28,12 +28,22 @@ class DatabaseManager {
                     return reject(err);
                 }
                 console.log(`Connected to the SQLite database: ${this.dbPath}`);
-                if (!dbExists) {
-                    this._applySchema().then(resolve).catch(reject);
-                } else {
-                    console.log('Database file already exists.');
+                
+                // Modified section for debugging - force schema application
+                console.log(`DEBUGGING: dbExists is ${dbExists}. Forcing schema application attempt.`);
+                this._applySchema().then(() => {
+                    console.log('DEBUGGING: Schema application attempt finished.');
                     resolve();
-                }
+                }).catch(err => {
+                    // If schema application fails (e.g., tables already exist), 
+                    // it might throw an error. We can choose to ignore it for now if dbExists was true.
+                    if (dbExists && err.message.includes('already exists')) { // Simple check
+                        console.log('DEBUGGING: Schema application failed as expected, tables likely already exist.');
+                        resolve(); // Resolve successfully if tables were already there
+                    } else {
+                        reject(err); // Reject for other errors
+                    }
+                });
             });
         });
     }
