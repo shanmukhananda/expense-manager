@@ -1,6 +1,7 @@
-// public/js/app.js
-import { ApiService } from '../../services/api-service.js';
-import { UIManager } from '../../views/js/ui.js';
+// src/controllers/app-controller.js
+
+import { ApiService } from '../services/api-service.js';
+import { UIManager } from '../views/ui.js';
 import { AnalyticsManager } from './analytics-controller.js';
 
 /**

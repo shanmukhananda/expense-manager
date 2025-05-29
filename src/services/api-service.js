@@ -1,4 +1,4 @@
-// public/js/api.js
+// src/services/api-service.js
 
 /**
  * ApiService class to handle all API interactions with the backend.

@@ -1,7 +1,8 @@
-// src/controllers/server/temp_controller.js
+// src/controllers/main_controller.js
+
 const path = require('path'); // Kept for now, though its main use in _setupMiddleware is removed.
-const AuxDataRepository = require('../../models/aux-data-repository');
-const ExpenseRepository = require('../../models/expense-repository');
+const AuxDataRepository = require('../models/aux-data-repository');
+const ExpenseRepository = require('../models/expense-repository');
 // getDatabaseManager is not used here as dbManager is injected
 // express and bodyParser are not required here as app is injected and middleware is handled in the main server file.
 

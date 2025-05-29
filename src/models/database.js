@@ -1,4 +1,5 @@
-// server/database.js
+// src/models/database.js
+
 const sqlite3 = require('sqlite3').verbose();
 const fs = require('fs');
 const path = require('path');
@@ -135,7 +136,7 @@ class DatabaseManager {
  * @returns {DatabaseManager} A new DatabaseManager instance.
  */
 function getDatabaseManager() {
-    const DB_PATH = path.resolve(__dirname, '../expense-manager.db');
+    const DB_PATH = path.resolve(__dirname, '../../expense-manager.db');
     const SCHEMA_PATH = path.resolve(__dirname, './schema.sql'); // Changed path
     return new DatabaseManager(DB_PATH, SCHEMA_PATH);
 }

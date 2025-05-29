@@ -2,7 +2,7 @@
 const express = require('express');
 const path = require('path');
 const getDatabaseManager = require('./src/models/database');
-const ExpenseManagerServerController = require('./src/controllers/server/main-controller');
+const ExpenseManagerServerController = require('./src/controllers/main-controller');
 
 async function main() {
     const dbManager = getDatabaseManager();
