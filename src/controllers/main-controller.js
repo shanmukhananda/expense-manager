@@ -11,10 +11,10 @@ class ExpenseManagerServerController {
         this.app = app;
         this.dbManager = dbManager;
 
-        this.groupRepository = new AuxDataRepository(this.dbManager, 'ExpenseGroups', 'expense_group_id');
-        this.categoryRepository = new AuxDataRepository(this.dbManager, 'ExpenseCategories', 'expense_category_id');
-        this.payerRepository = new AuxDataRepository(this.dbManager, 'Payers', 'payer_id');
-        this.paymentModeRepository = new AuxDataRepository(this.dbManager, 'PaymentMode', 'payment_mode_id');
+        this.groupRepository = new AuxDataRepository(this.dbManager, 'expense_groups', 'expense_group_id');
+        this.categoryRepository = new AuxDataRepository(this.dbManager, 'expense_categories', 'expense_category_id');
+        this.payerRepository = new AuxDataRepository(this.dbManager, 'payers', 'payer_id');
+        this.paymentModeRepository = new AuxDataRepository(this.dbManager, 'payment_mode', 'payment_mode_id');
         this.expenseRepository = new ExpenseRepository(this.dbManager);
 
         this._setupRoutes();
