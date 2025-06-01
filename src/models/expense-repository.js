@@ -24,11 +24,11 @@ class ExpenseRepository {
                 e.expense_category_id,
                 e.payer_id,
                 e.payment_mode_id
-            FROM Expenses e
-            JOIN ExpenseGroups eg ON e.expense_group_id = eg.id
-            JOIN ExpenseCategories ec ON e.expense_category_id = ec.id
-            JOIN Payers p ON e.payer_id = p.id
-            JOIN PaymentMode pm ON e.payment_mode_id = pm.id
+            FROM expenses e
+            JOIN expense_groups eg ON e.expense_group_id = eg.id
+            JOIN expense_categories ec ON e.expense_category_id = ec.id
+            JOIN payers p ON e.payer_id = p.id
+            JOIN payment_mode pm ON e.payment_mode_id = pm.id
             ORDER BY e.date DESC
         `;
         return this.dbManager.runQuery(sql);
@@ -42,7 +42,7 @@ class ExpenseRepository {
     async addExpense(expenseData) {
         const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = expenseData;
         const sql = `
-            INSERT INTO Expenses (expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description)
+            INSERT INTO expenses (expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description)
             VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
         const result = await this.dbManager.runCommand(sql, [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description]);
@@ -59,7 +59,7 @@ class ExpenseRepository {
     async updateExpense(id, expenseData) {
         const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = expenseData;
         const sql = `
-            UPDATE Expenses SET
+            UPDATE expenses SET
                 expense_group_id = $1,
                 expense_category_id = $2,
                 payer_id = $3,
@@ -83,7 +83,7 @@ class ExpenseRepository {
      * @throws {Error} If the expense is not found.
      */
     async deleteExpense(id) {
-        const sql = `DELETE FROM Expenses WHERE id = $1`;
+        const sql = `DELETE FROM expenses WHERE id = $1`;
         const result = await this.dbManager.runCommand(sql, [id]);
         if (result.changes === 0) {
             throw new Error('Expense not found.');
@@ -102,8 +102,8 @@ class ExpenseRepository {
                 e.amount,
                 ec.id AS category_id,
                 ec.name AS category_name
-            FROM Expenses e
-            JOIN ExpenseCategories ec ON e.expense_category_id = ec.id
+            FROM expenses e
+            JOIN expense_categories ec ON e.expense_category_id = ec.id
         `;
 
         const params = [];

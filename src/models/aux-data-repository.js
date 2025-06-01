@@ -68,7 +68,7 @@ class AuxDataRepository {
      */
     async _isReferenced(entityId) {
         if (!this.fkColumnName) return false; // Not a foreign key table for expenses
-        const sql = `SELECT COUNT(*) AS count FROM Expenses WHERE ${this.fkColumnName} = $1`;
+        const sql = `SELECT COUNT(*) AS count FROM expenses WHERE ${this.fkColumnName} = $1`;
         const rows = await this.dbManager.runQuery(sql, [entityId]);
         return rows[0].count > 0;
     }
