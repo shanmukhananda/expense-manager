@@ -43,7 +43,7 @@ class ExpenseRepository {
         const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = expenseData;
         const sql = `
             INSERT INTO Expenses (expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description)
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            VALUES ($1, $2, $3, $4, $5, $6, $7)
         `;
         const result = await this.dbManager.runCommand(sql, [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description]);
         return { id: result.id, ...expenseData };
@@ -60,14 +60,14 @@ class ExpenseRepository {
         const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description } = expenseData;
         const sql = `
             UPDATE Expenses SET
-                expense_group_id = ?,
-                expense_category_id = ?,
-                payer_id = ?,
-                payment_mode_id = ?,
-                date = ?,
-                amount = ?,
-                expense_description = ?
-            WHERE id = ?
+                expense_group_id = $1,
+                expense_category_id = $2,
+                payer_id = $3,
+                payment_mode_id = $4,
+                date = $5,
+                amount = $6,
+                expense_description = $7
+            WHERE id = $8
         `;
         const result = await this.dbManager.runCommand(sql, [expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount, expense_description, id]);
         if (result.changes === 0) {
@@ -83,7 +83,7 @@ class ExpenseRepository {
      * @throws {Error} If the expense is not found.
      */
     async deleteExpense(id) {
-        const sql = `DELETE FROM Expenses WHERE id = ?`;
+        const sql = `DELETE FROM Expenses WHERE id = $1`;
         const result = await this.dbManager.runCommand(sql, [id]);
         if (result.changes === 0) {
             throw new Error('Expense not found.');
@@ -108,16 +108,17 @@ class ExpenseRepository {
 
         const params = [];
         const whereClauses = [];
+        let paramIndex = 1;
 
         // Date filters
         if (filters.startDate && filters.endDate) {
-            whereClauses.push('e.date BETWEEN ? AND ?');
+            whereClauses.push(`e.date BETWEEN $${paramIndex++} AND $${paramIndex++}`);
             params.push(filters.startDate, filters.endDate);
         } else if (filters.startDate) {
-            whereClauses.push('e.date >= ?');
+            whereClauses.push(`e.date >= $${paramIndex++}`);
             params.push(filters.startDate);
         } else if (filters.endDate) {
-            whereClauses.push('e.date <= ?');
+            whereClauses.push(`e.date <= $${paramIndex++}`);
             params.push(filters.endDate);
         }
 
@@ -128,7 +129,7 @@ class ExpenseRepository {
                 categoryIds = categoryIds.trim() === '' ? [] : categoryIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
             }
             if (Array.isArray(categoryIds) && categoryIds.length > 0) {
-                whereClauses.push(`e.expense_category_id IN (${categoryIds.map(() => '?').join(',')})`);
+                whereClauses.push(`e.expense_category_id IN (${categoryIds.map(() => `$${paramIndex++}`).join(',')})`);
                 params.push(...categoryIds);
             }
         }
@@ -140,7 +141,7 @@ class ExpenseRepository {
                 paymentModeIds = paymentModeIds.trim() === '' ? [] : paymentModeIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
             }
             if (Array.isArray(paymentModeIds) && paymentModeIds.length > 0) {
-                whereClauses.push(`e.payment_mode_id IN (${paymentModeIds.map(() => '?').join(',')})`);
+                whereClauses.push(`e.payment_mode_id IN (${paymentModeIds.map(() => `$${paramIndex++}`).join(',')})`);
                 params.push(...paymentModeIds);
             }
         }
@@ -152,7 +153,7 @@ class ExpenseRepository {
                 groupIds = groupIds.trim() === '' ? [] : groupIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
             }
             if (Array.isArray(groupIds) && groupIds.length > 0) {
-                whereClauses.push(`e.expense_group_id IN (${groupIds.map(() => '?').join(',')})`);
+                whereClauses.push(`e.expense_group_id IN (${groupIds.map(() => `$${paramIndex++}`).join(',')})`);
                 params.push(...groupIds);
             }
         }
@@ -164,7 +165,7 @@ class ExpenseRepository {
                 payerIds = payerIds.trim() === '' ? [] : payerIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
             }
             if (Array.isArray(payerIds) && payerIds.length > 0) {
-                whereClauses.push(`e.payer_id IN (${payerIds.map(() => '?').join(',')})`);
+                whereClauses.push(`e.payer_id IN (${payerIds.map(() => `$${paramIndex++}`).join(',')})`);
                 params.push(...payerIds);
             }
         }

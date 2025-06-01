@@ -22,7 +22,7 @@ class AuxDataRepository {
      * @returns {Promise<Object>} The created entity with its ID.
      */
     async add(name) {
-        const sql = `INSERT INTO ${this.tableName} (name) VALUES (?)`;
+        const sql = `INSERT INTO ${this.tableName} (name) VALUES ($1)`;
         const result = await this.dbManager.runCommand(sql, [name]);
         return { id: result.id, name };
     }
@@ -35,7 +35,7 @@ class AuxDataRepository {
      * @throws {Error} If the record is not found.
      */
     async update(id, name) {
-        const sql = `UPDATE ${this.tableName} SET name = ? WHERE id = ?`;
+        const sql = `UPDATE ${this.tableName} SET name = $1 WHERE id = $2`;
         const result = await this.dbManager.runCommand(sql, [name, id]);
         if (result.changes === 0) {
             throw new Error(`${this.tableName.slice(0, -1)} not found or no changes made.`);
@@ -53,7 +53,7 @@ class AuxDataRepository {
         if (this.fkColumnName && await this._isReferenced(id)) {
             throw new Error(`Cannot delete ${this.tableName.slice(0, -1)}: it is associated with existing expenses.`);
         }
-        const sql = `DELETE FROM ${this.tableName} WHERE id = ?`;
+        const sql = `DELETE FROM ${this.tableName} WHERE id = $1`;
         const result = await this.dbManager.runCommand(sql, [id]);
         if (result.changes === 0) {
             throw new Error(`${this.tableName.slice(0, -1)} not found.`);
@@ -68,7 +68,7 @@ class AuxDataRepository {
      */
     async _isReferenced(entityId) {
         if (!this.fkColumnName) return false; // Not a foreign key table for expenses
-        const sql = `SELECT COUNT(*) AS count FROM Expenses WHERE ${this.fkColumnName} = ?`;
+        const sql = `SELECT COUNT(*) AS count FROM Expenses WHERE ${this.fkColumnName} = $1`;
         const rows = await this.dbManager.runQuery(sql, [entityId]);
         return rows[0].count > 0;
     }
