@@ -10,9 +10,10 @@ class DatabaseManager {
      * @param {string} schemaPath - The path to the SQL schema file.
      */
     constructor(connectionString, schemaPath) {
-        // Default PostgreSQL connection string
-        // IMPORTANT: Replace with your actual connection details
-        this.connectionString = connectionString || 'postgresql://user:password@localhost:5432/expense_manager_db';
+        if (!connectionString) {
+            throw new Error('Database connection string is required.');
+        }
+        this.connectionString = connectionString;
         this.schemaPath = schemaPath;
         this.pool = null; // pg Pool instance
     }
@@ -146,14 +147,4 @@ class DatabaseManager {
     }
 }
 
-/**
- * Creates and returns a new instance of the DatabaseManager.
- * @returns {DatabaseManager} A new DatabaseManager instance.
- */
-function getDatabaseManager() {
-    // SCHEMA_PATH is still needed, connection string will use default from constructor
-    const SCHEMA_PATH = path.resolve(__dirname, './schema.sql');
-    return new DatabaseManager(null, SCHEMA_PATH); // Pass null for connectionString to use default
-}
-
-module.exports = getDatabaseManager;
+module.exports = DatabaseManager;
