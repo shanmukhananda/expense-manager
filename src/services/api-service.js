@@ -5,6 +5,19 @@
  * Uses Fetch API to make requests to the Node.js server.
  */
 export class ApiService {
+    // --- Database Connection Methods ---
+    async connectDB(connectionString) {
+        return this.post('/db/connect', { connectionString });
+    }
+
+    async disconnectDB() {
+        return this.post('/db/disconnect', {});
+    }
+
+    async getDBStatus() {
+        return this.get('/db/status');
+    }
+
     constructor() {
         // Ensure this matches your server's port
         this.baseUrl = 'http://localhost:3000/api';

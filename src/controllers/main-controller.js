@@ -21,7 +21,13 @@ class ExpenseManagerServerController {
     }
 
     _setupRoutes() {
+        // --- Database Connection Routes ---
+        this.app.post('/api/db/connect', this._handleDbConnect.bind(this));
+        this.app.post('/api/db/disconnect', this._handleDbDisconnect.bind(this));
+        this.app.get('/api/db/status', this._handleDbStatus.bind(this));
+
         // Endpoint to initialize/check database (called by frontend on load)
+        // This might be deprecated or behave differently now. For now, keep it but guard it.
         this.app.get('/api/init-db', this._handleInitDb.bind(this));
 
         // Generic CRUD routes for master data using repositories
@@ -53,15 +59,62 @@ class ExpenseManagerServerController {
         this.app.get('/api/expenses/analytics', this._handleGetAnalyticsData.bind(this));
     }
 
+    // --- New Database Control Handlers ---
+    async _handleDbConnect(req, res) {
+        const { connectionString } = req.body;
+        if (!connectionString) {
+            return res.status(400).json({ success: false, message: 'Connection string is required.' });
+        }
+        try {
+            // If already connected, this.dbManager.initialize should handle closing the old pool
+            // and opening a new one. This depends on DatabaseManager's implementation.
+            // For safety, one might explicitly call this.dbManager.close() first if defined.
+            if (this.dbManager.pool) {
+                 console.log("DB Connect: Existing pool found, attempting to close before reconnecting.");
+                 await this.dbManager.close(); // Assuming close is graceful if no pool exists
+            }
+            await this.dbManager.initialize(connectionString); // Assumes initialize can take a string
+            res.json({ success: true, message: 'Database connected successfully.' });
+        } catch (err) {
+            console.error('Failed to connect to database:', err);
+            res.status(500).json({ success: false, message: 'Failed to connect to database.', error: err.message });
+        }
+    }
+
+    async _handleDbDisconnect(req, res) {
+        try {
+            if (this.dbManager.pool) {
+                await this.dbManager.close();
+            }
+            res.json({ success: true, message: 'Database disconnected successfully.' });
+        } catch (err) {
+            console.error('Failed to disconnect from database:', err);
+            res.status(500).json({ success: false, message: 'Failed to disconnect from database.', error: err.message });
+        }
+    }
+
+    async _handleDbStatus(req, res) {
+        // Check if dbManager.pool is not null and has some indication of being active.
+        // The exact check might depend on the pg library's pool object structure.
+        // A simple check for pool existence is a starting point.
+        const isConnected = !!this.dbManager.pool;
+        res.json({ connected: isConnected });
+    }
+
     /**
      * Handles the initial database setup request.
+     * NOTE: This endpoint's role might change. If the DB is connected via /api/db/connect,
+     * this might just be a status check or be deprecated.
      */
     async _handleInitDb(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first via /api/db/connect.' });
+        }
         try {
-            // await this.dbManager.initialize(); // This is now done in the main server.js
-            res.status(200).send({ message: 'Database connection is managed and ready for operations.' });
+            // If dbManager.pool exists, assume it's initialized.
+            res.status(200).send({ message: 'Database connection is active and schema should be initialized.' });
         } catch (error) {
-            console.error('Database readiness check failed:', error);
+            console.error('Database readiness check failed (though pool exists):', error);
             res.status(500).json({ error: 'Database readiness check failed.' });
         }
     }
@@ -70,6 +123,9 @@ class ExpenseManagerServerController {
      * Generic handler for fetching all records from a repository.
      */
     async _handleGetAll(repository, req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         try {
             const data = await repository.getAll();
             res.json(data);
@@ -83,6 +139,9 @@ class ExpenseManagerServerController {
      * Generic handler for adding a new record via a repository.
      */
     async _handleAdd(repository, req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const { name } = req.body;
         if (!name) {
             return res.status(400).json({ error: 'Name is required.' });
@@ -103,6 +162,9 @@ class ExpenseManagerServerController {
      * Generic handler for updating an existing record via a repository.
      */
     async _handleUpdate(repository, req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const { id } = req.params;
         const { name } = req.body;
         if (!name) {
@@ -126,6 +188,9 @@ class ExpenseManagerServerController {
      * Generic handler for deleting a record via a repository.
      */
     async _handleDelete(repository, req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const { id } = req.params;
         try {
             await repository.delete(id);
@@ -143,6 +208,9 @@ class ExpenseManagerServerController {
 
     // Expense specific handlers, utilizing ExpenseRepository
     async _handleGetAllExpenses(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         try {
             const expenses = await this.expenseRepository.getAllExpenses();
             res.json(expenses);
@@ -153,6 +221,9 @@ class ExpenseManagerServerController {
     }
 
     async _handleAddExpense(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const expenseData = req.body;
         if (!this._validateExpenseData(expenseData, res)) {
             return; // Validation failed, response sent by _validateExpenseData
@@ -170,6 +241,9 @@ class ExpenseManagerServerController {
     }
 
     async _handleUpdateExpense(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const { id } = req.params;
         const expenseData = req.body;
         if (!this._validateExpenseData(expenseData, res, true)) {
@@ -190,6 +264,9 @@ class ExpenseManagerServerController {
     }
 
     async _handleDeleteExpense(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         const { id } = req.params;
         try {
             await this.expenseRepository.deleteExpense(id);
@@ -204,6 +281,9 @@ class ExpenseManagerServerController {
     }
 
     async _handleGetAnalyticsData(req, res) {
+        if (!this.dbManager.pool) {
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
         try {
             // req.query contains the filter parameters from the frontend
             // These are already strings, including comma-separated strings for IDs
