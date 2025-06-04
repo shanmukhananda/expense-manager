@@ -9,10 +9,8 @@ class DatabaseManager {
      * @param {string} connectionString - The PostgreSQL connection string.
      * @param {string} schemaPath - The path to the SQL schema file.
      */
-    constructor(connectionString, schemaPath) {
-        if (!connectionString) {
-            throw new Error('Database connection string is required.');
-        }
+    constructor(connectionString = null, schemaPath) {
+        // Allow connectionString to be optional or null
         this.connectionString = connectionString;
         this.schemaPath = schemaPath;
         this.pool = null; // pg Pool instance
@@ -21,9 +19,22 @@ class DatabaseManager {
     /**
      * Initializes the PostgreSQL database using pg.Pool.
      * It attempts to connect and then applies the schema.
+     * Can accept a new connectionString to re-initialize.
+     * @param {string | null} newConnectionString - Optional new connection string.
      * @returns {Promise<void>} A promise that resolves when the database is ready.
      */
-    async initialize() {
+    async initialize(newConnectionString = null) {
+        if (newConnectionString) {
+            if (this.pool) {
+                await this.close(); // Close existing connection if any
+            }
+            this.connectionString = newConnectionString;
+        }
+
+        if (!this.connectionString) {
+            throw new Error('Database connection string not available. Cannot initialize.');
+        }
+
         this.pool = new Pool({ connectionString: this.connectionString });
 
         try {
@@ -138,12 +149,15 @@ class DatabaseManager {
             try {
                 await this.pool.end();
                 console.log('Database pool closed.');
-                this.pool = null;
             } catch (err) {
                 console.error('Error closing database pool:', err.message);
+                // Set pool to null even if closing throws an error, to allow re-initialization attempt
+                this.pool = null;
                 throw err;
             }
+            this.pool = null; // Ensure pool is set to null after successful close
         }
+        // If this.pool is already null, do nothing.
     }
 }
 

@@ -5,31 +5,14 @@ const readline = require('readline');
 const DatabaseManager = require('./src/models/database');
 const ExpenseManagerServerController = require('./src/controllers/main-controller');
 
-// Function to prompt user for database connection details
-async function promptForDbDetails() {
-    const rl = readline.createInterface({
-        input: process.stdin,
-        output: process.stdout
-    });
-
-    return new Promise((resolve) => {
-        rl.question('Please enter your PostgreSQL connection string: ', (connectionString) => {
-            rl.close();
-            resolve(connectionString);
-        });
-    });
-}
+// Removed promptForDbDetails function
 
 async function main() {
-    const connectionString = await promptForDbDetails();
-
-    if (!connectionString || connectionString.trim() === '') {
-        console.error('PostgreSQL connection string is required. Exiting.');
-        process.exit(1);
-    }
+    // Removed connectionString prompt
 
     const SCHEMA_PATH = path.resolve(__dirname, 'src', 'models', 'schema.sql');
-    const dbManager = new DatabaseManager(connectionString, SCHEMA_PATH);
+    // Initialize DatabaseManager with null connection string
+    const dbManager = new DatabaseManager(null, SCHEMA_PATH);
     const PORT = 3000;
 
     const app = express();
@@ -54,15 +37,13 @@ async function main() {
         res.sendFile(path.join(__dirname, 'src', 'views', 'index.html'));
     });
 
-    try {
-        await dbManager.initialize(); 
-        app.listen(PORT, () => {
-            console.log(`Server running on http://localhost:${PORT}`); 
-        });
-    } catch (err) {
-        console.error('Failed to start server:', err); 
-        process.exit(1);
-    }
+    // Server starts without immediate DB initialization
+    // DB initialization will be triggered by an API call
+    app.listen(PORT, () => {
+        console.log(`Server running on http://localhost:${PORT}`);
+        console.log('Database will be initialized and connected via API endpoints.');
+    });
+    // Removed try-catch block that previously handled dbManager.initialize() failure at startup
 }
 
 main();

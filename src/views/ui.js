@@ -81,6 +81,11 @@ export class UIManager {
             contentAnalytics: document.getElementById('content-analytics'),
             analyticsFiltersContainer: document.getElementById('analytics-filters-container'),
             analyticsResultsContainer: document.getElementById('analytics-results-container'),
+
+            // Database connection elements
+            dbConnectionString: document.getElementById('db-connection-string'),
+            dbConnectToggle: document.getElementById('db-connect-toggle'),
+            dbConnectionStatusMessage: null, // Will be created dynamically
         };
     }
 
@@ -99,6 +104,14 @@ export class UIManager {
         this._setupEditExpenseModalListeners();
 
         this.elements.expenseDate.valueAsDate = new Date(); // Set today's date
+
+        if (this.elements.dbConnectToggle) {
+            this.elements.dbConnectToggle.addEventListener('click', () => {
+                if (this.onConnectToggle) {
+                    this.onConnectToggle();
+                }
+            });
+        }
     }
 
     /**
@@ -234,6 +247,12 @@ export class UIManager {
      * @type {function(Object): Promise<void>}
      */
     onEditExpense = () => {};
+
+    /**
+     * Callback for database connect/disconnect toggle.
+     * @type {function(): Promise<void>}
+     */
+    onConnectToggle = async () => {};
 
     /**
      * Attaches add button listeners. This is called by the App class
@@ -596,5 +615,100 @@ export class UIManager {
         this.populateDropdown(this.elements.editExpenseCategorySelect, data.categories, 'Select Category');
         this.populateDropdown(this.elements.editExpensePayerSelect, data.payers, 'Select Payer');
         this.populateDropdown(this.elements.editExpensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
+    }
+
+    /**
+     * Gets the database connection string from the input field.
+     * @returns {string} The database connection string.
+     */
+    getDatabasePath() {
+        return this.elements.dbConnectionString ? this.elements.dbConnectionString.value.trim() : '';
+    }
+
+    /**
+     * Sets the visual status of the database connection.
+     * @param {boolean} isConnected - True if connected, false otherwise.
+     * @param {string} connectionMessage - Message to display (e.g., "Connected" or error).
+     */
+    setConnectionStatus(isConnected, connectionMessage) {
+        if (!this.elements.dbConnectToggle || !this.elements.dbConnectionString) {
+            return;
+        }
+
+        const button = this.elements.dbConnectToggle;
+        const input = this.elements.dbConnectionString;
+
+        // Create or get status message element
+        if (!this.elements.dbConnectionStatusMessage) {
+            this.elements.dbConnectionStatusMessage = document.createElement('p');
+            this.elements.dbConnectionStatusMessage.className = 'text-sm mt-1';
+            input.parentNode.insertBefore(this.elements.dbConnectionStatusMessage, input.nextSibling.nextSibling); // Insert after button
+        }
+        const statusMessageElement = this.elements.dbConnectionStatusMessage;
+
+        if (isConnected) {
+            button.textContent = 'Disconnect';
+            button.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-blue-600', 'hover:bg-blue-700', 'bg-gray-500', 'hover:bg-gray-600');
+            button.classList.add('bg-red-600', 'hover:bg-red-700'); // Red for disconnect
+            statusMessageElement.textContent = connectionMessage;
+            statusMessageElement.className = 'text-sm mt-1 text-green-600';
+            input.disabled = true;
+            this._setMainUIEnabled(true);
+        } else {
+            button.textContent = 'Connect';
+            button.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
+            // Use a neutral or initial color for connect
+            button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            statusMessageElement.textContent = connectionMessage;
+            statusMessageElement.className = 'text-sm mt-1 text-red-600'; // Red for error/disconnected message
+            input.disabled = false;
+            input.value = ''; // Clear the input field when disconnected
+            this._setMainUIEnabled(false);
+        }
+    }
+
+    /**
+     * Enables or disables main UI elements.
+     * @private
+     * @param {boolean} enabled - True to enable, false to disable.
+     */
+    _setMainUIEnabled(enabled) {
+        // Disable/Enable tab buttons
+        this.elements.tabButtons.forEach(button => button.disabled = !enabled);
+
+        // Disable/Enable add forms (inputs and buttons)
+        const formElements = [
+            this.elements.groupNameInput, this.elements.addGroupBtn,
+            this.elements.categoryNameInput, this.elements.addCategoryBtn,
+            this.elements.payerNameInput, this.elements.addPayerBtn,
+            this.elements.paymentModeNameInput, this.elements.addPaymentModeBtn,
+            this.elements.expenseDate, this.elements.expenseAmount,
+            this.elements.expenseGroupSelect, this.elements.expenseCategorySelect,
+            this.elements.expensePayerSelect, this.elements.expensePaymentModeSelect,
+            this.elements.expenseDescription, this.elements.addExpenseBtn,
+        ];
+
+        formElements.forEach(el => {
+            if (el) el.disabled = !enabled;
+        });
+
+        // Optionally, add a visual cue for disabled sections (e.g., opacity)
+        this.elements.tabContents.forEach(content => {
+            content.style.opacity = enabled ? '1' : '0.5';
+            content.style.pointerEvents = enabled ? 'auto' : 'none';
+        });
+
+        // Clear lists if UI is disabled (optional, or show a message)
+        if (!enabled) {
+            this.elements.groupsList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage groups.</p>';
+            this.elements.categoriesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage categories.</p>';
+            this.elements.payersList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage payers.</p>';
+            this.elements.paymentModesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage payment modes.</p>';
+            this.elements.expensesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage expenses.</p>';
+            // Also clear analytics or show a similar message
+             if (this.elements.analyticsResultsContainer) {
+                this.elements.analyticsResultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to view analytics.</p>';
+            }
+        }
     }
 }
