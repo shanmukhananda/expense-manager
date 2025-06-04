@@ -84,25 +84,30 @@ node import_csv.js --database_url "postgres://username:password@host:port/databa
 
 ### CSV File Format
 
-The CSV file must have a header row and the following columns in order:
+The CSV file must include a header row with the following column names (order is flexible as long as headers are present):
 
-1.  `Date`: The date of the expense (e.g., "1-Jun-2025"). The script expects day-month-year format.
-2.  `Amount`: The monetary value of the expense (e.g., "250.75").
-3.  `Category`: The category of the expense (e.g., "Utilities", "Groceries").
-4.  `Description`: A brief description of the expense (e.g., "Monthly electricity bill").
+-   `Date`: Date of the expense (e.g., "1-Jul-2024"). Expected format: DD-Mon-YYYY.
+-   `Amount`: Monetary value of the expense (e.g., "120.50").
+-   `Expense Category`: Category of the expense (e.g., "Groceries").
+-   `Expense Description`: Brief description (e.g., "Weekly food supplies"). Optional.
+-   `Expense Group`: Group for the expense (e.g., "Household").
+-   `Payer`: Person or account that paid (e.g., "Alice").
+-   `Payment mode`: Method of payment (e.g., "Credit Card").
 
 **Example CSV data:**
 ```csv
-Date,Amount,Category,Description
-1-Jun-2025,26250,Rent,house rent
-2-Jun-2025,75.50,Groceries,Weekly shopping
+Date,Amount,Expense Category,Expense Description,Expense Group,Payer,Payment mode
+1-Jul-2024,120.50,Groceries,Weekly food supplies,Household,Alice,Credit Card
+2-Jul-2024,45.00,Transport,City bus pass,Commute,Alice,Online Wallet
 ```
 
 ### Script Behavior
 
--   **Database Schema:** The script will attempt to apply the database schema defined in `src/models/schema.sql` if the tables do not already exist. This is handled by the `DatabaseManager` class used by the script.
--   **Default Entities:** It will find or create default records in the `expense_groups`, `payers`, and `payment_mode` tables (e.g., "CSV Imports Default Group", "CSV Imports Default Payer", "CSV Imports Default Mode"). These defaults are used for the corresponding fields in the imported expenses.
--   **Categories:** If a category specified in the CSV file does not exist in the `expense_categories` table, the script will create it.
--   **Expense Insertion:** Validated and processed data from the CSV will be inserted into the `expenses` table. Each row is processed individually.
--   **Logging:** The script provides console output detailing its progress, including successful operations, warnings for skipped rows, and any errors encountered. Critical errors will terminate the script.
--   **Validation:** The script validates required fields (Date, Amount, Category) and formats for Date and Amount. Rows failing validation are skipped.
+-   **Database Schema:** Applies the schema from `src/models/schema.sql` if tables don't exist.
+-   **Dynamic Entity Creation:** `Expense Category`, `Expense Group`, `Payer`, and `Payment mode` values from the CSV are dynamically managed. If an entity with the given name doesn't exist in its respective table, it will be created. The script then uses the ID of the found or created entity when inserting the expense.
+-   **Expense Insertion:** Validated rows from the CSV are inserted into the `expenses` table, linked to the appropriate category, group, payer, and payment mode.
+-   **Data Validation:**
+    *   **Required Fields:** `Date`, `Amount`, `Expense Category`, `Expense Group`, `Payer`, and `Payment mode` are mandatory. Rows missing any of these (or with empty values) will be skipped. `Expense Description` is optional.
+    *   **Format Checks:** `Date` and `Amount` fields are validated for correct format.
+    *   Skipped rows are reported with warnings.
+-   **Logging:** Provides console output detailing its progress, including created/found entities, processed rows, insertions, warnings for skipped rows, and errors. Critical errors terminate the script.
