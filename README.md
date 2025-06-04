@@ -56,3 +56,53 @@ To run this application with a PostgreSQL database, you'll need to set it up loc
     - Open your web browser and go to http://localhost:3000.
 
 This application provides a simple yet effective way to keep your expenses organized!
+
+
+## CSV Import Script (`import_csv.js`)
+
+This script allows you to import expense data from a CSV file into the application's PostgreSQL database.
+
+### Prerequisites
+
+- Node.js (version X.X.X or later recommended)
+- Access to a running PostgreSQL server.
+- Project dependencies installed: Run `npm install` in the project root directory.
+
+### Usage
+
+Execute the script from the project root directory using the following command:
+
+```bash
+node import_csv.js --database_url "postgres://username:password@host:port/database_name" --csv_path "./path/to/your/data.csv"
+```
+
+**Arguments:**
+
+-   `--database_url` (or `--db`): **Required**. The full connection URL for your PostgreSQL database.
+    Format: `postgres://username:password@host:port/database_name`
+-   `--csv_path` (or `--csv`): **Required**. The file path to the CSV file containing the expense data.
+
+### CSV File Format
+
+The CSV file must have a header row and the following columns in order:
+
+1.  `Date`: The date of the expense (e.g., "1-Jun-2025"). The script expects day-month-year format.
+2.  `Amount`: The monetary value of the expense (e.g., "250.75").
+3.  `Category`: The category of the expense (e.g., "Utilities", "Groceries").
+4.  `Description`: A brief description of the expense (e.g., "Monthly electricity bill").
+
+**Example CSV data:**
+```csv
+Date,Amount,Category,Description
+1-Jun-2025,26250,Rent,house rent
+2-Jun-2025,75.50,Groceries,Weekly shopping
+```
+
+### Script Behavior
+
+-   **Database Schema:** The script will attempt to apply the database schema defined in `src/models/schema.sql` if the tables do not already exist. This is handled by the `DatabaseManager` class used by the script.
+-   **Default Entities:** It will find or create default records in the `expense_groups`, `payers`, and `payment_mode` tables (e.g., "CSV Imports Default Group", "CSV Imports Default Payer", "CSV Imports Default Mode"). These defaults are used for the corresponding fields in the imported expenses.
+-   **Categories:** If a category specified in the CSV file does not exist in the `expense_categories` table, the script will create it.
+-   **Expense Insertion:** Validated and processed data from the CSV will be inserted into the `expenses` table. Each row is processed individually.
+-   **Logging:** The script provides console output detailing its progress, including successful operations, warnings for skipped rows, and any errors encountered. Critical errors will terminate the script.
+-   **Validation:** The script validates required fields (Date, Amount, Category) and formats for Date and Amount. Rows failing validation are skipped.
