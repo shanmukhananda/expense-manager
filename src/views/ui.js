@@ -662,6 +662,7 @@ export class UIManager {
             statusMessageElement.textContent = connectionMessage;
             statusMessageElement.className = 'text-sm mt-1 text-red-600'; // Red for error/disconnected message
             input.disabled = false;
+            input.value = ''; // Clear the input field when disconnected
             this._setMainUIEnabled(false);
         }
     }
