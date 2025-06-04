@@ -13,6 +13,7 @@ class App {
     constructor() {
         this.api = new ApiService();
         this.ui = new UIManager();
+        this.activeTabId = null; // Initialize activeTabId
         this.analyticsManager = new AnalyticsManager(
             this.ui,
             this.ui.elements.analyticsFiltersContainer,
@@ -104,6 +105,7 @@ class App {
      * @param {string} tabId - The ID of the activated tab.
      */
     async _handleTabChange(tabId) {
+        this.activeTabId = tabId; // Store active tab
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', 'Please connect to the database to view data.');
             // Ensure the previously active tab (if any) remains visually selected,
@@ -148,7 +150,14 @@ class App {
                         groups: this.groups,
                         payers: this.payers
                     }, this._handleApplyAnalyticsFilters.bind(this));
-                    this.analyticsManager.renderAnalyticsResults(null); // Clear previous results
+                    // Set the callbacks for editing/deleting expenses shown in analytics
+                    this.analyticsManager.setExpenseActionCallbacks(
+                        this._handleEditExpense.bind(this),
+                        this._handleDeleteExpense.bind(this)
+                    );
+                    // Optionally, trigger an initial analytics data load or clear results
+                    // await this._handleApplyAnalyticsFilters(); // Load initial data
+                    this.analyticsManager.renderAnalyticsResults(null); // Or just clear previous results
                     break;
             }
         } catch (error) {
@@ -274,7 +283,8 @@ class App {
 
     _renderExpenses() {
         if (!this.dbConnected) return;
-        this.ui.renderExpenses(this.expenses, this._handleEditExpense.bind(this), this._handleDeleteExpense.bind(this));
+        // Update the call to this.ui.renderExpenses to match the new signature
+        this.ui.renderExpenses(this.expenses, this.ui.elements.expensesList, this._handleEditExpense.bind(this), this._handleDeleteExpense.bind(this));
     }
 
     // --- Generic CRUD Handlers ---
@@ -370,11 +380,10 @@ class App {
         // Ensure master data for dropdowns is available
         if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
             console.log('_handleEditExpense: Master data missing, attempting to load.');
-            await this.loadInitialData(); // Load data if not already present
-            if (!this.dbConnected) return; // loadInitialData might fail if DB is still down
-            // If still missing after load, inform user and don't open modal
+            await this.loadInitialData();
+            if (!this.dbConnected) return;
             if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
-                 this.ui.showInfoModal('Data Missing', 'Could not load necessary master data (groups, categories, etc.) for editing. Please try again.');
+                 this.ui.showInfoModal('Data Missing', 'Could not load necessary master data for editing. Please try again.');
                  return;
             }
         }
@@ -386,15 +395,27 @@ class App {
             paymentModes: this.paymentModes
         }, async (updatedExpenseData) => {
             try {
-                await this.api.updateExpense(updatedExpenseData.id, updatedExpenseData);
-                await this._handleTabChange('tab-expenses');
+                const updatedExpense = await this.api.updateExpense(updatedExpenseData.id, updatedExpenseData);
+                if (updatedExpense) {
+                    this.ui.showInfoModal('Success', 'Expense updated successfully.');
+                    // Refresh data based on the current tab
+                    if (this.activeTabId === 'tab-analytics') {
+                        await this._handleApplyAnalyticsFilters();
+                    } else {
+                        // For expenses tab or any other, reload expenses and re-render that tab
+                        await this.loadInitialData(); // Reloads all master data and expenses
+                        this._renderExpenses(); // Re-renders the main expense list
+                    }
+                    // Ensure dropdowns in forms are also up-to-date if master data could have changed (though not typical for expense edit)
+                    // await this._loadAndDisplayMasterData(); // Potentially redundant if loadInitialData called
+                }
             } catch (error) {
                 this.ui.showInfoModal('Edit Error', `Failed to update expense: ${error.message}`);
             }
         });
     }
 
-    // --- Specific Delete Handlers (delegating to generic) ---
+    // --- Specific Delete Handlers (delegating to generic for master data) ---
     async _handleDeleteGroup(id) {
         await this._handleDeleteEntity(() => this.api.deleteGroup(id), 'group', 'tab-groups');
     }
@@ -411,8 +432,28 @@ class App {
         await this._handleDeleteEntity(() => this.api.deletePaymentMode(id), 'payment mode', 'tab-payment-modes');
     }
 
+    // Make _handleDeleteExpense non-generic to handle specific refresh logic
     async _handleDeleteExpense(id) {
-        await this._handleDeleteEntity(() => this.api.deleteExpense(id), 'expense', 'tab-expenses');
+        if (!this.dbConnected) {
+            this.ui.showInfoModal('Not Connected', 'Please connect to the database to delete an expense.');
+            return;
+        }
+        try {
+            await this.api.deleteExpense(id);
+            this.ui.showInfoModal('Success', 'Expense deleted successfully.');
+            // Refresh data based on the current tab
+            if (this.activeTabId === 'tab-analytics') {
+                await this._handleApplyAnalyticsFilters();
+            } else {
+                // For expenses tab or any other, reload expenses and re-render that tab
+                await this.loadInitialData(); // Reloads all master data and expenses
+                this._renderExpenses(); // Re-renders the main expense list
+            }
+            // Ensure dropdowns in forms are also up-to-date if master data could have changed
+            // await this._loadAndDisplayMasterData(); // Potentially redundant if loadInitialData called
+        } catch (error) {
+            this.ui.showInfoModal('Delete Error', `Failed to delete expense: ${error.message}`);
+        }
     }
 }
 

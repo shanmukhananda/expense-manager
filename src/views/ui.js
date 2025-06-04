@@ -511,22 +511,31 @@ export class UIManager {
     /**
      * Renders the list of all expenses.
      * @param {Array<Object>} expenses - The array of expense objects from the API.
-     * @param {function(Object): Promise<void>} onEdit - Callback for edit action.
-     * @param {function(number): Promise<void>} onDelete - Callback for delete action.
+     * Renders the list of all expenses into a specified container.
+     * @param {Array<Object>} expenses - The array of expense objects.
+     * @param {HTMLElement} containerElement - The DOM element to render into.
+     * @param {function(Object): Promise<void>|null} onEdit - Callback for edit action. Can be null.
+     * @param {function(number): Promise<void>|null} onDelete - Callback for delete action. Can be null.
      */
-    renderExpenses(expenses, onEdit, onDelete) {
-        const containerElement = this.elements.expensesList;
-        containerElement.innerHTML = '';
+    renderExpenses(expenses, containerElement, onEdit, onDelete) {
+        // const containerElement = this.elements.expensesList; // Remove this line
+        if (!containerElement) {
+            console.error("Render expenses called without a valid container.");
+            return;
+        }
+        containerElement.innerHTML = ''; // Clear the provided container
 
         if (!expenses || expenses.length === 0) {
-            containerElement.innerHTML = `<p class="text-gray-500 text-center py-4">No expenses added yet.</p>`;
+            containerElement.innerHTML = `<p class="text-gray-500 text-center py-4">No expenses to display.</p>`;
             return;
         }
 
         const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
 
         sortedExpenses.forEach(exp => {
-            const expenseDiv = this._createExpenseListItem(exp);
+            // Pass onEdit and onDelete to _createExpenseListItem to decide if buttons should be rendered
+            const expenseDiv = this._createExpenseListItem(exp, onEdit, onDelete);
+            // _addExpenseListItemListeners will also need to know about onEdit, onDelete to avoid errors
             this._addExpenseListItemListeners(expenseDiv, exp, onEdit, onDelete);
             containerElement.appendChild(expenseDiv);
         });
@@ -536,14 +545,14 @@ export class UIManager {
      * Creates a single list item HTML element for an expense.
      * @private
      * @param {Object} exp - The expense object.
+     * @param {function(Object): Promise<void>|null} onEditCallback - Callback for edit action.
+     * @param {function(number): Promise<void>|null} onDeleteCallback - Callback for delete action.
      * @returns {HTMLElement} The created div element.
      */
-    _createExpenseListItem(exp) {
+    _createExpenseListItem(exp, onEditCallback, onDeleteCallback) {
         const expenseDiv = document.createElement('div');
-        // Apply new base classes to expenseDiv
         expenseDiv.className = 'bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:shadow-md transition-shadow duration-150';
 
-        // Main content area
         let contentHtml = `
             <div class="flex-grow w-full sm:w-auto">
                 <div class="flex justify-between items-start">
@@ -563,24 +572,25 @@ export class UIManager {
         if (exp.expense_description) {
             contentHtml += `<p class="text-xs text-gray-500 mt-2 italic">"${exp.expense_description}"</p>`;
         }
-        contentHtml += `</div>`; // Close flex-grow
+        contentHtml += `</div>`;
 
-        // Buttons
-        const buttonsHtml = `
-            <div class="flex gap-2 self-start sm:self-center mt-3 sm:mt-0">
-                <button class="edit-expense-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Edit Expense">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
-                    </svg>
-                </button>
-                <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Delete Expense">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
-                    </svg>
-                </button>
-            </div>
-        `;
-
+        let buttonsHtml = '';
+        if (onEditCallback && onDeleteCallback) { // Only add buttons if callbacks are provided
+            buttonsHtml = `
+                <div class="flex gap-2 self-start sm:self-center mt-3 sm:mt-0">
+                    <button class="edit-expense-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Edit Expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
+                        </svg>
+                    </button>
+                    <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Delete Expense">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+            `;
+        }
         expenseDiv.innerHTML = contentHtml + buttonsHtml;
         return expenseDiv;
     }
@@ -590,16 +600,28 @@ export class UIManager {
      * @private
      * @param {HTMLElement} expenseDiv - The div element containing the buttons.
      * @param {Object} exp - The expense object.
-     * @param {function(Object): Promise<void>} onEdit - Callback for edit.
-     * @param {function(number): Promise<void>} onDelete - Callback for delete.
+     * @param {function(Object): Promise<void>|null} onEditCallback - Callback for edit.
+     * @param {function(number): Promise<void>|null} onDeleteCallback - Callback for delete.
      */
-    _addExpenseListItemListeners(expenseDiv, exp, onEdit, onDelete) {
-        expenseDiv.querySelector('.edit-expense-btn').addEventListener('click', () => {
-            onEdit(exp);
-        });
-        expenseDiv.querySelector('.delete-expense-btn').addEventListener('click', () => {
-            this.showDeleteModal('Delete Expense', 'Are you sure you want to delete this expense?', () => onDelete(exp.id));
-        });
+    _addExpenseListItemListeners(expenseDiv, exp, onEditCallback, onDeleteCallback) {
+        if (onEditCallback) {
+            const editBtn = expenseDiv.querySelector('.edit-expense-btn');
+            if (editBtn) {
+                editBtn.addEventListener('click', () => {
+                    // Call the onEditCallback, which is onEdit passed from renderExpenses
+                    onEditCallback(exp);
+                });
+            }
+        }
+
+        if (onDeleteCallback) {
+            const deleteBtn = expenseDiv.querySelector('.delete-expense-btn');
+            if (deleteBtn) {
+                deleteBtn.addEventListener('click', () => {
+                    this.showDeleteModal('Delete Expense', 'Are you sure you want to delete this expense?', () => onDeleteCallback(exp.id));
+                });
+            }
+        }
     }
 
     /**

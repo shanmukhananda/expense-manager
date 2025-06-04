@@ -22,7 +22,20 @@ export class AnalyticsManager {
             groupSelect: null, // Added
             payerSelect: null,   // Added
             applyFiltersBtn: null,
-        }; 
+        };
+        this.onEditExpense = null;
+        this.onDeleteExpense = null;
+    }
+
+    /**
+     * Sets callback functions for handling expense edit and delete actions.
+     * These callbacks are typically provided by AppController and will be passed to UIManager.
+     * @param {Function|null} onEdit - Callback for editing an expense.
+     * @param {Function|null} onDelete - Callback for deleting an expense.
+     */
+    setExpenseActionCallbacks(onEdit, onDelete) {
+        this.onEditExpense = onEdit;
+        this.onDeleteExpense = onDelete;
     }
 
     /**
@@ -182,7 +195,10 @@ export class AnalyticsManager {
         const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
         const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
 
-        if (totalFilteredCount === 0 && (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0)) {
+        // Check if there's absolutely nothing to show
+        if (totalFilteredCount === 0 &&
+            (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
+            (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
             this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No expenses match the selected filters.</p>';
             return;
         }
@@ -228,10 +244,40 @@ export class AnalyticsManager {
                     </table>
                 </div>
             `;
-        } else if (totalFilteredCount > 0) { 
-             resultsHTML += '<p class="text-gray-500 text-center py-4">No category-specific data to display for the selection.</p>';
+        } else if (totalFilteredCount > 0 && (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
+            // Only show this if there are no individual expenses to list either
+            resultsHTML += '<p class="text-gray-500 text-center py-4 mt-4">No category-specific data to display for the selection.</p>';
         }
         
-        this.resultsContainer.innerHTML = resultsHTML;
+        // Section for filtered expense details
+        if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
+            resultsHTML += `
+                <h4 class="text-lg font-semibold text-gray-800 mt-6 mb-2">Filtered Expense Details (${analyticsData.filteredExpenses.length})</h4>
+                <div id="analytics-filtered-expenses-list" class="max-h-[32rem] overflow-y-auto border border-gray-200 rounded-lg shadow-inner p-1 bg-gray-50 space-y-3">
+                    <!-- Expense items will be rendered here by UIManager -->
+                </div>
+            `;
+        } else if (totalFilteredCount > 0 && (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0)) {
+             // This case is tricky. If totalFilteredCount > 0, but no breakdown and no individual list,
+             // it implies data exists but isn't being displayed in detail.
+             // The message above for "No category-specific data" might cover it if filteredExpenses is also empty.
+             // For now, if there's a total count but no expenses list, we'll assume the category message is enough or no explicit message needed here.
+        }
+
+
+        this.resultsContainer.innerHTML = resultsHTML; // Set the HTML structure
+
+        // Now, if the container for filtered expenses was added, populate it.
+        if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
+            const expenseListContainer = this.resultsContainer.querySelector('#analytics-filtered-expenses-list');
+            if (expenseListContainer && this.uiManager && typeof this.uiManager.renderExpenses === 'function') {
+                // Pass null for callbacks if they are not set, UIManager.renderExpenses should handle this
+                const editCallback = this.onEditExpense || null;
+                const deleteCallback = this.onDeleteExpense || null;
+                this.uiManager.renderExpenses(analyticsData.filteredExpenses, expenseListContainer, editCallback, deleteCallback);
+            } else if (expenseListContainer) {
+                expenseListContainer.innerHTML = "<p class='text-red-500 p-2'>Error: UI manager could not render expense details here.</p>";
+            }
+        }
     }
 }

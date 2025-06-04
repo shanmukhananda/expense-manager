@@ -7,10 +7,11 @@ class ExpenseRepository {
 
     /**
      * Fetches all expenses with joined details.
+     * @param {boolean} filterByCurrentMonth - Optional. If true, filters expenses by the current month.
      * @returns {Promise<Array<Object>>}
      */
-    async getAllExpenses() {
-        const sql = `
+    async getAllExpenses(filterByCurrentMonth = false) {
+        let sql = `
             SELECT
                 e.id,
                 e.date,
@@ -29,9 +30,14 @@ class ExpenseRepository {
             JOIN expense_categories ec ON e.expense_category_id = ec.id
             JOIN payers p ON e.payer_id = p.id
             JOIN payment_mode pm ON e.payment_mode_id = pm.id
-            ORDER BY e.date DESC
-        `;
-        return this.dbManager.runQuery(sql);
+    `;
+        const params = [];
+        if (filterByCurrentMonth) {
+            // Assuming PostgreSQL syntax for current month
+            sql += ` WHERE TO_CHAR(e.date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
+        }
+        sql += ` ORDER BY e.date DESC`;
+        return this.dbManager.runQuery(sql, params);
     }
 
     /**
@@ -95,15 +101,27 @@ class ExpenseRepository {
         let totalFilteredCount = 0;
         const categoryBreakdown = [];
         const categoryTotals = {};
-        const categoryNames = {};
+        // categoryNames map is no longer needed as category_name is directly available in rows.
 
         let sql = `
             SELECT
+                e.id,
+                e.date,
                 e.amount,
-                ec.id AS category_id,
-                ec.name AS category_name
+                e.expense_description,
+                eg.name AS group_name,
+                ec.name AS category_name,
+                p.name AS payer_name,
+                pm.name AS payment_mode_name,
+                e.expense_group_id,
+                e.expense_category_id,
+                e.payer_id,
+                e.payment_mode_id
             FROM expenses e
+            JOIN expense_groups eg ON e.expense_group_id = eg.id
             JOIN expense_categories ec ON e.expense_category_id = ec.id
+            JOIN payers p ON e.payer_id = p.id
+            JOIN payment_mode pm ON e.payment_mode_id = pm.id
         `;
 
         const params = [];
@@ -173,26 +191,31 @@ class ExpenseRepository {
         if (whereClauses.length > 0) {
             sql += ' WHERE ' + whereClauses.join(' AND ');
         }
+        // Add ORDER BY to make the list of expenses consistent
+        sql += ` ORDER BY e.date DESC`;
 
         const rows = await this.dbManager.runQuery(sql, params);
+        const filteredExpenses = rows; // These are the detailed expenses
 
         if (rows && rows.length > 0) {
-            totalFilteredCount = rows.length; 
+            totalFilteredCount = rows.length;
             rows.forEach(row => {
                 overallTotal += row.amount;
-                categoryTotals[row.category_id] = (categoryTotals[row.category_id] || 0) + row.amount;
-                if (!categoryNames[row.category_id]) { 
-                    categoryNames[row.category_id] = row.category_name;
-                }
+                // For category breakdown, use expense_category_id and category_name from the row
+                const categoryId = row.expense_category_id;
+                categoryTotals[categoryId] = (categoryTotals[categoryId] || 0) + row.amount;
+                // categoryNames map is no longer needed
             });
         }
 
         for (const categoryId in categoryTotals) {
             const totalAmount = categoryTotals[categoryId];
             const percentage = overallTotal === 0 ? 0 : (totalAmount / overallTotal) * 100;
+            // Find a representative row for the category name
+            const representativeRow = rows.find(r => r.expense_category_id == categoryId);
             categoryBreakdown.push({
                 categoryId: parseInt(categoryId),
-                categoryName: categoryNames[categoryId],
+                categoryName: representativeRow ? representativeRow.category_name : 'Unknown Category', // Fallback
                 totalAmount: parseFloat(totalAmount.toFixed(2)),
                 percentage: parseFloat(percentage.toFixed(2))
             });
@@ -203,7 +226,8 @@ class ExpenseRepository {
         return {
             overallTotal: parseFloat(overallTotal.toFixed(2)),
             totalFilteredCount,
-            categoryBreakdown
+            categoryBreakdown,
+            filteredExpenses // Add the new field
         };
     }
 }
