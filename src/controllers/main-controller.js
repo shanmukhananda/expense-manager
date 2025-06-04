@@ -212,7 +212,8 @@ class ExpenseManagerServerController {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
         }
         try {
-            const expenses = await this.expenseRepository.getAllExpenses();
+            // Pass true to filter by current month when DB is connected
+            const expenses = await this.expenseRepository.getAllExpenses(true); // New call
             res.json(expenses);
         } catch (err) {
             console.error('Error fetching expenses:', err.message);
