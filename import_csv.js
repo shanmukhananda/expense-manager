@@ -2,246 +2,327 @@ const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const fs = require('fs');
 const path = require('path');
-// Assuming DatabaseManager will be used, prepare its import path
 const DatabaseManager = require('./src/models/database.js');
-const csv = require('csv-parser'); // For CSV parsing
+const csv = require('csv-parser');
 
-const DEFAULT_GROUP_NAME = 'CSV Imports Default Group';
-const DEFAULT_PAYER_NAME = 'CSV Imports Default Payer';
-const DEFAULT_MODE_NAME = 'CSV Imports Default Mode';
+class CsvImporter {
+    constructor() {
+        this.argv = null;
+        this.dbManager = null;
+        // Removed defaultGroupId, defaultPayerId, defaultModeId initializations
+        this.processedRows = []; // To store rows processed from CSV
 
-async function findOrCreateDefaultEntity(dbManager, tableName, entityNameColumn, entityName) {
-    try {
-        // Try to find the entity
-        let result = await dbManager.query(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
-        if (result.rows.length > 0) {
-            return result.rows[0].id;
-        } else {
-            // If not found, insert it
-            result = await dbManager.query(`INSERT INTO ${tableName} (${entityNameColumn}) VALUES ($1) RETURNING id`, [entityName]);
-            return result.rows[0].id;
+        // Removed DEFAULT_GROUP_NAME, DEFAULT_PAYER_NAME, DEFAULT_MODE_NAME definitions
+    }
+
+    _parseArguments() {
+        this.argv = yargs(hideBin(process.argv))
+            .option('database_url', {
+                alias: 'db',
+                type: 'string',
+                description: 'PostgreSQL database connection URL',
+                demandOption: true,
+            })
+            .option('csv_path', {
+                alias: 'csv',
+                type: 'string',
+                description: 'Path to the CSV file to import',
+                demandOption: true,
+            })
+            .usage('Usage: $0 --database_url <db_url> --csv_path <path_to_csv>')
+            .help('h')
+            .alias('h', 'help')
+            .epilogue('For more information, find the documentation at a Pinned Google Cloud Project') // Consider updating if not applicable
+            .argv;
+
+        if (!fs.existsSync(this.argv.csv_path)) {
+            // This error is critical and should stop execution.
+            // Throwing an error here will be caught by the global catch block in main().
+            throw new Error(`CSV file not found at ${this.argv.csv_path}`);
         }
-    } catch (error) {
-        console.error(`Error finding or creating default entity in ${tableName} with name ${entityName}:`, error);
-        throw error; // Re-throw the error to be caught by the main catch block
     }
-}
 
-async function findOrCreateCategory(dbManager, categoryName) {
-    try {
-        const queryResult = await dbManager.query("SELECT id FROM expense_categories WHERE name = $1", [categoryName]);
-        if (queryResult.rows.length > 0) {
-            console.log(`Found category '${categoryName}' with ID: ${queryResult.rows[0].id}`);
-            return queryResult.rows[0].id;
-        } else {
-            const insertResult = await dbManager.query("INSERT INTO expense_categories (name) VALUES ($1) RETURNING id", [categoryName]);
-            console.log(`Created category '${categoryName}' with ID: ${insertResult.rows[0].id}`);
-            return insertResult.rows[0].id;
+    async _initializeDatabase() {
+        try {
+            this.dbManager = new DatabaseManager(this.argv.database_url, path.resolve(__dirname, 'src', 'models', 'schema.sql'));
+            await this.dbManager.initialize();
+            console.log('Database initialized successfully.');
+        } catch (error) {
+            // Log the specific error and re-throw to be caught by run()'s catch block
+            console.error('Error initializing database:', error.message);
+            throw error;
         }
-    } catch (error) {
-        console.error(`Error finding or creating category '${categoryName}':`, error);
-        throw error; // Re-throw to be caught by the main CSV processing catch block
-    }
-}
-
-async function main() {
-    const argv = yargs(hideBin(process.argv))
-        .option('database_url', {
-            alias: 'db',
-            type: 'string',
-            description: 'PostgreSQL database connection URL',
-            demandOption: true, // Makes this argument required
-        })
-        .option('csv_path', {
-            alias: 'csv',
-            type: 'string',
-            description: 'Path to the CSV file to import',
-            demandOption: true, // Makes this argument required
-        })
-        .usage('Usage: $0 --database_url <db_url> --csv_path <path_to_csv>')
-        .help('h')
-        .alias('h', 'help')
-        .epilogue('For more information, find the documentation at a Pinned Google Cloud Project')
-        .argv;
-
-    console.log('Starting CSV import process...');
-    console.log('Database URL:', argv.database_url);
-    console.log('CSV File Path:', argv.csv_path);
-
-    // Basic validation for CSV file existence
-    if (!fs.existsSync(argv.csv_path)) {
-        console.error(`Error: CSV file not found at ${argv.csv_path}`);
-        process.exit(1);
     }
 
-    // Placeholder for database connection and processing
-    const dbManager = new DatabaseManager(argv.database_url, path.resolve(__dirname, 'src', 'models', 'schema.sql'));
-    try {
-        await dbManager.initialize();
-        console.log('Database initialized successfully.');
+    async _findOrCreateEntity(tableName, entityName, entityNameColumn = 'name', logPrefix = 'Entity') {
+        try {
+            let result = await this.dbManager.query(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
+            if (result.rows.length > 0) {
+                console.log(`${logPrefix} '${entityName}' found with ID: ${result.rows[0].id}`);
+                return result.rows[0].id;
+            } else {
+                // Using query for INSERT ... RETURNING id, as runCommand might not be suited for RETURNING.
+                // If DatabaseManager.runCommand is specifically designed for INSERTs returning ID, that could be used.
+                // Based on prior usage (findOrCreateCategory), .query was used for INSERT...RETURNING.
+                result = await this.dbManager.query(`INSERT INTO ${tableName} (${entityNameColumn}) VALUES ($1) RETURNING id`, [entityName]);
+                console.log(`${logPrefix} '${entityName}' created with ID: ${result.rows[0].id}`);
+                return result.rows[0].id;
+            }
+        } catch (error) {
+            console.error(`Error finding or creating ${logPrefix.toLowerCase()} in ${tableName} with name ${entityName}:`, error.message);
+            throw error; // Re-throw to be handled by the calling method or run()'s catch block
+        }
+    }
 
-        // Find or create default entities
-        const defaultGroupId = await findOrCreateDefaultEntity(dbManager, 'expense_groups', 'name', DEFAULT_GROUP_NAME);
-        console.log(`Using Expense Group ID: ${defaultGroupId}`);
+    // Removed _ensureDefaultEntities method
 
-        const defaultPayerId = await findOrCreateDefaultEntity(dbManager, 'payers', 'name', DEFAULT_PAYER_NAME);
-        console.log(`Using Payer ID: ${defaultPayerId}`);
+    async _findOrCreateCategory(categoryName) {
+        // This method is a specific use case of _findOrCreateEntity
+        return this._findOrCreateEntity('expense_categories', categoryName, 'name', 'Category');
+    }
 
-        const defaultModeId = await findOrCreateDefaultEntity(dbManager, 'payment_mode', 'name', DEFAULT_MODE_NAME);
-        console.log(`Using Payment Mode ID: ${defaultModeId}`);
+    async _processRow(row) {
+        try {
+            // Adjust to new CSV column names
+            const dateStr = row['Date'];
+            const amountStr = row['Amount'];
+            const categoryStr = row['Expense Category'];
+            const descriptionStr = row['Expense Description'] || ''; // Default to empty string if undefined
+            const groupStr = row['Expense Group'];
+            const payerStr = row['Payer'];
+            const modeStr = row['Payment mode'];
 
-        // CSV Reading and Processing Logic
-        let processedRows = [];
-        await new Promise((resolve, reject) => {
-            fs.createReadStream(argv.csv_path)
+            const requiredFields = {
+                'Date': dateStr,
+                'Amount': amountStr,
+                'Expense Category': categoryStr,
+                'Expense Group': groupStr,
+                'Payer': payerStr,
+                'Payment mode': modeStr
+            };
+
+            for (const fieldName in requiredFields) {
+                // Check for null, undefined, or empty string after trimming
+                if (requiredFields[fieldName] == null || String(requiredFields[fieldName]).trim() === '') {
+                    console.warn(`Skipping row due to missing or empty required field '${fieldName}':`, row);
+                    return null;
+                }
+            }
+
+            let formattedDate;
+            const dateParts = dateStr.split('-');
+            if (dateParts.length === 3) {
+                const day = dateParts[0].padStart(2, '0');
+                const monthNames = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+                const month = monthNames[dateParts[1]];
+                const year = dateParts[2];
+                if (month && day.length === 2 && year.length === 4) {
+                    formattedDate = `${year}-${month}-${day}`;
+                } else {
+                    console.warn(`Skipping row due to invalid date components: ${dateStr}`, row);
+                    return null;
+                }
+            } else {
+                console.warn(`Skipping row due to invalid date format: ${dateStr}`, row);
+                return null;
+            }
+
+            const numericAmount = parseFloat(amountStr);
+            if (isNaN(numericAmount)) {
+                console.warn(`Skipping row due to invalid amount: ${amountStr}`, row);
+                return null;
+            }
+
+            const categoryId = await this._findOrCreateCategory(categoryStr); // Uses 'Expense Category'
+            const expenseGroupId = await this._findOrCreateEntity('expense_groups', groupStr, 'name', 'Expense Group');
+            const payerId = await this._findOrCreateEntity('payers', payerStr, 'name', 'Payer');
+            const paymentModeId = await this._findOrCreateEntity('payment_mode', modeStr, 'name', 'Payment Mode');
+
+            // Check if any entity creation failed (they throw on error, caught by general catch)
+            // but as an additional safeguard if they were changed to return null:
+            if (!categoryId || !expenseGroupId || !payerId || !paymentModeId) {
+                 console.error(`Skipping row due to failure in finding/creating one or more linked entities (Category, Group, Payer, Mode):`, row);
+                 return null;
+            }
+
+            return {
+                date: formattedDate,
+                amount: numericAmount,
+                categoryId: categoryId,
+                description: descriptionStr,
+                expenseGroupId: expenseGroupId,
+                payerId: payerId,
+                paymentModeId: paymentModeId,
+                originalRow: row
+            };
+        } catch (error) {
+            console.error('Error processing a single row, skipping:', row, error.message);
+            return null; // Ensure null is returned on any error within this method
+        }
+    }
+
+    _handleStreamError(error, reject) {
+        console.error('Error during CSV stream processing:', error.message);
+        reject(error);
+    }
+
+    async _handleStreamData(row, tempProcessedRows) {
+        // This wrapper is to ensure that if _processRow itself has an unhandled async error,
+        // it doesn't crash the stream data handler directly.
+        try {
+            const processed = await this._processRow(row);
+            if (processed) {
+                tempProcessedRows.push(processed);
+            }
+        } catch (err) {
+            // This catch is for unexpected errors from _processRow if it wasn't fully catching its own errors.
+            // _processRow is designed to return null on error, so this should be rare.
+            console.error('Unhandled error in _handleStreamData calling _processRow:', err.message, "Row:", row);
+        }
+    }
+
+    _handleStreamEnd(resolve, tempProcessedRows) {
+        this.processedRows = tempProcessedRows; // Assign to the class property
+        console.log(`Finished CSV parsing. Found ${this.processedRows.length} valid rows to import.`);
+        resolve();
+    }
+
+    async _processCsvFile() {
+        return new Promise((resolve, reject) => {
+            const tempProcessedRows = [];
+            fs.createReadStream(this.argv.csv_path)
                 .pipe(csv())
-                .on('data', async (row) => { // Made this async
-                    try {
-                        // Destructure with guards for missing columns
-                        const { Date: dateStr, Amount: amountStr, Category: categoryStr, Description: descriptionStr = '' } = row;
-
-                        if (!dateStr || !amountStr || !categoryStr) {
-                            console.error('Skipping row due to missing Date, Amount, or Category:', row);
-                            return; // Skip this row
-                        }
-
-                        // Date Conversion (e.g., "1-Jun-2025" to "YYYY-MM-DD")
-                        let formattedDate;
-                        const dateParts = dateStr.split('-');
-                        if (dateParts.length === 3) {
-                            const day = dateParts[0].padStart(2, '0');
-                            const monthNames = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-                            const month = monthNames[dateParts[1]];
-                            const year = dateParts[2];
-                            if (month && day.length === 2 && year.length === 4) {
-                                formattedDate = `${year}-${month}-${day}`;
-                            } else {
-                                console.error(`Skipping row due to invalid date components: ${dateStr}`, row);
-                                return;
-                            }
-                        } else {
-                            console.error(`Skipping row due to invalid date format: ${dateStr}`, row);
-                            return;
-                        }
-
-                        // Amount Conversion
-                        const numericAmount = parseFloat(amountStr);
-                        if (isNaN(numericAmount)) {
-                            console.error(`Skipping row due to invalid amount: ${amountStr}`, row);
-                            return;
-                        }
-
-                        const categoryId = await findOrCreateCategory(dbManager, categoryStr);
-
-                        processedRows.push({
-                            date: formattedDate,
-                            amount: numericAmount,
-                            categoryId: categoryId,
-                            description: descriptionStr,
-                            defaultGroupId: defaultGroupId,
-                            defaultPayerId: defaultPayerId,
-                            defaultModeId: defaultModeId,
-                            originalRow: row // For logging/debugging if needed
-                        });
-
-                    } catch (err) {
-                        console.error("Error processing a row, skipping:", row, err);
-                        // Decide if you want to stop the whole import or just skip the row
-                        // For now, it just skips. If 'reject(err)' was called, it would stop.
-                    }
+                .on('data', (row) => {
+                    // Intentionally not awaiting _handleStreamData here to process rows concurrently
+                    // as much as the stream provides them. _handleStreamData itself is async.
+                    // Errors within _handleStreamData (and thus _processRow) are caught and logged there.
+                    // If one row processing fails, it logs and skips, doesn't stop the stream.
+                    this._handleStreamData(row, tempProcessedRows).catch(streamDataError => {
+                        // This catch is for errors if _handleStreamData itself throws an unhandled exception,
+                        // which is unlikely given its internal try/catch.
+                        console.error('Unexpected error from _handleStreamData in stream pipeline:', streamDataError.message);
+                        // Optionally, could call reject(streamDataError) here if such an error should stop all processing.
+                    });
                 })
-                .on('end', () => {
-                    console.log(`Finished processing CSV. Found ${processedRows.length} valid rows. Ready for expense insertion.`);
-                    // console.log('Processed rows data:', JSON.stringify(processedRows, null, 2)); // Optional: log data for debugging
-                    resolve();
-                })
-                .on('error', (error) => {
-                    console.error('Error reading or processing CSV file:', error);
-                    reject(error); // This will make the outer Promise reject
-                });
+                .on('error', (err) => this._handleStreamError(err, reject))
+                .on('end', () => this._handleStreamEnd(resolve, tempProcessedRows));
         });
+    }
 
-        // Insert expenses into the database
+    async run() {
+        try {
+            this._parseArguments(); // This will throw if CSV path is invalid.
+            console.log('Starting CSV import process...');
+            console.log('Database URL:', this.argv.database_url);
+            console.log('CSV File Path:', this.argv.csv_path);
+
+            await this._initializeDatabase();
+            // Removed call to await this._ensureDefaultEntities();
+            await this._processCsvFile();
+            await this._insertExpenses();
+
+            console.log('CSV import process completed successfully.');
+
+        } catch (error) {
+            // This catch block handles errors from _parseArguments, _initializeDatabase, _ensureDefaultEntities, _processCsvFile, _insertExpenses
+            // and any future errors from CSV processing or insertions if they are not caught more locally.
+            // Specific error messages are logged by the methods where they occur.
+            // This logs a general message and then re-throws for main().catch() to handle exit.
+            console.error('Aborting CSV import process due to error. See details above. Error message:', error.message);
+            throw error;
+        } finally {
+            if (this.dbManager && this.dbManager.pool) {
+                try {
+                    await this.dbManager.close();
+                    console.log('Database connection closed.');
+                } catch (closeError) {
+                    console.error('Error closing database connection:', closeError.message);
+                }
+            }
+        }
+    }
+
+    async _insertExpenses() {
         let successfulInserts = 0;
         let failedInserts = 0;
 
-        if (processedRows.length === 0) {
+        if (this.processedRows.length === 0) {
             console.log('No processed rows available to insert into expenses.');
-        } else {
-            console.log(`Attempting to insert ${processedRows.length} expenses...`);
-            for (const row of processedRows) {
-                const {
-                    date: formattedDate,
-                    amount: numericAmount,
-                    categoryId,
-                    description,
-                    defaultGroupId,
-                    defaultPayerId,
-                    defaultModeId,
-                    originalRow
-                } = row;
+            return;
+        }
 
-                const sql = `
-                    INSERT INTO expenses (
-                        expense_group_id,
-                        expense_category_id,
-                        payer_id,
-                        payment_mode_id,
-                        date,
-                        amount,
-                        expense_description
-                    ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;
-                `;
-                const params = [
-                    defaultGroupId,
-                    categoryId,
-                    defaultPayerId,
-                    defaultModeId,
-                    formattedDate,
-                    numericAmount,
-                    description || null
-                ];
+        console.log(`Attempting to insert ${this.processedRows.length} expenses...`);
 
-                try {
-                    const result = await dbManager.query(sql, params); // Assuming query can handle RETURNING id
-                    if (result.rows.length > 0) {
-                         console.log(`Successfully inserted expense for date ${formattedDate}, amount ${numericAmount}. Expense ID: ${result.rows[0].id}`);
-                        successfulInserts++;
-                    } else {
-                        // This case should ideally not happen if RETURNING id is used and insert is successful without error
-                        console.warn(`Expense insertion for date ${formattedDate} did not return an ID, but no error was thrown. Original row:`, originalRow);
-                        failedInserts++; // Or handle as a success if your DB doesn't always return ID but doesn't error
-                    }
-                } catch (insertError) {
-                    console.error(`Failed to insert expense for date ${formattedDate}, amount ${numericAmount}. Error:`, insertError.message, "Original row:", originalRow);
+        for (const row of this.processedRows) {
+            const {
+                date: formattedDate, // This is the formattedDate from _processRow
+                amount: numericAmount, // This is the numericAmount from _processRow
+                categoryId,
+                description,
+                expenseGroupId,
+                payerId,
+                paymentModeId,
+                originalRow
+            } = row; // 'row' here is an object from this.processedRows
+
+            const sql = `
+                INSERT INTO expenses (
+                    expense_group_id,
+                    expense_category_id,
+                    payer_id,
+                    payment_mode_id,
+                    date,
+                    amount,
+                    expense_description
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id;
+            `;
+            const params = [
+                expenseGroupId,
+                categoryId,
+                payerId,
+                paymentModeId,
+                formattedDate,
+                numericAmount,
+                description || null
+            ];
+
+            try {
+                // Using .query as established for operations that return data (like RETURNING id)
+                const result = await this.dbManager.query(sql, params);
+                if (result.rows && result.rows.length > 0 && result.rows[0].id) {
+                    console.log(`Successfully inserted expense ID: ${result.rows[0].id} for original date ${originalRow.Date}, amount ${originalRow.Amount}`);
+                    successfulInserts++;
+                } else {
+                    // This case might occur if RETURNING id is not supported/configured correctly or if the insert somehow succeeds without error but returns no rows.
+                    console.warn(`Expense insertion for original row ${JSON.stringify(originalRow)} may have succeeded but did not return an ID. Consider it failed for accounting.`);
                     failedInserts++;
                 }
-            }
-            console.log(`Expense Insertion Summary: ${successfulInserts} succeeded, ${failedInserts} failed.`);
-        }
-
-        await dbManager.close();
-        console.log('Database connection closed.');
-    } catch (error) {
-        console.error('Critical error during CSV import process:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
-        if (dbManager && dbManager.pool) { // Ensure pool exists before trying to close
-            try {
-                await dbManager.close();
-                console.log('Database connection closed during error handling.');
-            } catch (closeError) {
-                console.error('Failed to close database connection during error handling:', closeError.message);
+            } catch (error) {
+                console.error(`Error inserting expense for original row ${JSON.stringify(originalRow)}: ${error.message}`);
+                failedInserts++;
             }
         }
-        process.exit(1);
+        console.log(`Expense Insertion Summary: ${successfulInserts} succeeded, ${failedInserts} failed.`);
+        if (failedInserts > 0) {
+             // Ensure the overall process indicates failure if any insertions fail.
+            throw new Error(`${failedInserts} expenses failed to insert. See logs for details.`);
+        }
     }
+}
 
-    console.log('CSV import process finished.');
+// Main execution
+async function main() {
+    const importer = new CsvImporter();
+    await importer.run();
 }
 
 main().catch(error => {
-    // This outer catch is for errors thrown synchronously by main() itself before its own try/catch
-    // or if main() is not async and something it calls (not awaited) rejects.
-    // Given main is async, most errors should be caught by its internal try/catch.
-    console.error('Unhandled error in main execution:', error.message, error.stack ? `\nStack: ${error.stack}` : '');
+    // This global catch block is now simpler.
+    // It primarily handles logging the error message from importer.run() and exiting.
+    console.error('Critical error during CSV import process. See details above. Error message:', error.message);
+    if (error.stack && !error.message.includes(error.stack.split('\n')[1])) { // Avoid redundant stack if message contains it
+        // Stacks are useful for debugging, so log them if available and not redundant.
+        console.error("Stacktrace:", error.stack);
+    }
     process.exit(1);
 });

@@ -1,0 +1,10 @@
+Date,Amount,Expense Category,Expense Description,Expense Group,Payer,Payment mode
+10-May-2024,30.00,Transport,Taxi fare,Work Travel,Charles,Cash
+,20.00,Snacks,Office snacks,Personal,Charles,Cash
+12-May-2024,INVALID,Food,Lunch with client,Work Travel,Diana,Credit Card
+13-May-2024,50.00,,Client dinner,Work Travel,Charles,Credit Card
+14-May-2024,70.00,Utilities,Internet bill,,Diana,Online Wallet
+15-May-2024,40.00,Stationery,Office pens,Work Supplies,Charles,,Credit Card
+16-May-2024,25.00,Coffee,Morning brew,Personal,Diana
+17-May-2024,100.00,Accommodation,Hotel for trip,Work Travel,Charles,Credit Card
+18-May-2024-Extra,60.00,Meals,Airport meal,Work Travel,Diana,Credit Card

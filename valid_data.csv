@@ -1,0 +1,6 @@
+Date,Amount,Expense Category,Expense Description,Expense Group,Payer,Payment mode
+1-Apr-2024,150.75,Groceries,Weekly groceries,Home Expenses,Alice,Credit Card
+2-Apr-2024,60.00,Transport,Bus pass,Work Commute,Alice,Online Wallet
+3-Apr-2024,1200.00,Rent,Monthly apartment rent,Home Expenses,Bob,Bank Transfer
+4-Apr-2024,45.50,Entertainment,Movie night,Leisure,Alice,Credit Card
+5-Apr-2024,80.20,Groceries,Fruits and vegetables,Home Expenses,Bob,Cash
