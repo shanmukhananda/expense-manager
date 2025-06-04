@@ -471,10 +471,10 @@ export class UIManager {
      */
     _createEntityListItem(item, entityTypeName) {
         const itemDiv = document.createElement('div');
-        itemDiv.className = 'flex items-center justify-between p-3 border-b border-gray-200 last:border-b-0';
+        itemDiv.className = 'flex flex-col items-start sm:flex-row sm:items-center sm:justify-between p-3 border-b border-gray-200 last:border-b-0';
         itemDiv.innerHTML = `
             <span class="text-gray-800 font-medium text-lg">${item.name}</span>
-            <div class="flex gap-2">
+            <div class="flex gap-2 mt-2 sm:mt-0">
                 <button class="edit-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${item.id}" title="Rename ${entityTypeName}">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
