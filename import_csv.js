@@ -9,10 +9,8 @@ class CsvImporter {
     constructor() {
         this.argv = null;
         this.dbManager = null;
-        // Removed defaultGroupId, defaultPayerId, defaultModeId initializations
         this.processedRows = []; // To store rows processed from CSV
-
-        // Removed DEFAULT_GROUP_NAME, DEFAULT_PAYER_NAME, DEFAULT_MODE_NAME definitions
+        this.entityCreationLocks = new Map(); // For concurrency control
     }
 
     _parseArguments() {
@@ -55,23 +53,77 @@ class CsvImporter {
     }
 
     async _findOrCreateEntity(tableName, entityName, entityNameColumn = 'name', logPrefix = 'Entity') {
-        try {
-            let result = await this.dbManager.query(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
-            if (result.rows.length > 0) {
-                console.log(`${logPrefix} '${entityName}' found with ID: ${result.rows[0].id}`);
-                return result.rows[0].id;
-            } else {
-                // Using query for INSERT ... RETURNING id, as runCommand might not be suited for RETURNING.
-                // If DatabaseManager.runCommand is specifically designed for INSERTs returning ID, that could be used.
-                // Based on prior usage (findOrCreateCategory), .query was used for INSERT...RETURNING.
-                result = await this.dbManager.query(`INSERT INTO ${tableName} (${entityNameColumn}) VALUES ($1) RETURNING id`, [entityName]);
-                console.log(`${logPrefix} '${entityName}' created with ID: ${result.rows[0].id}`);
-                return result.rows[0].id;
-            }
-        } catch (error) {
-            console.error(`Error finding or creating ${logPrefix.toLowerCase()} in ${tableName} with name ${entityName}:`, error.message);
-            throw error; // Re-throw to be handled by the calling method or run()'s catch block
+        const lockKey = `${tableName}-${entityNameColumn}-${entityName}`;
+
+        if (this.entityCreationLocks.has(lockKey)) {
+            console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) operation already pending, awaiting existing promise.`);
+            return this.entityCreationLocks.get(lockKey);
         }
+
+        let promiseResolver, promiseRejector;
+        const newPromise = new Promise((resolve, reject) => {
+            promiseResolver = resolve;
+            promiseRejector = reject;
+        });
+        this.entityCreationLocks.set(lockKey, newPromise);
+        console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) - new promise lock SET.`);
+
+        (async () => {
+            let successfullyResolved = false;
+            try {
+                console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) locked: performing initial SELECT.`);
+                const rows = await this.dbManager.runQuery(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
+                if (rows.length > 0) {
+                    console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) found on initial SELECT with ID: ${rows[0].id}.`);
+                    successfullyResolved = true;
+                    promiseResolver(rows[0].id);
+                    return;
+                }
+
+                console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) not found on initial SELECT, proceeding to INSERT.`);
+                const insertResult = await this.dbManager.runCommand(`INSERT INTO ${tableName} (${entityNameColumn}) VALUES ($1)`, [entityName]);
+                if (insertResult && insertResult.id !== undefined) {
+                    console.log(`${logPrefix} '${entityName}' (key: ${lockKey}) created with ID: ${insertResult.id}`);
+                    successfullyResolved = true;
+                    promiseResolver(insertResult.id);
+                } else {
+                    throw new Error(`${logPrefix} '${entityName}' (key: ${lockKey}) creation did not return an ID.`);
+                }
+            } catch (error) {
+                if (error.code === '23505' || (error.message && error.message.includes('duplicate key value violates unique constraint'))) {
+                    console.warn(`Warn: ${logPrefix} '${entityName}' (key: ${lockKey}) INSERT failed due to duplicate key. Attempting final SELECT.`);
+                    try {
+                        const finalRows = await this.dbManager.runQuery(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
+                        if (finalRows.length > 0) {
+                            console.log(`DEBUG: ${logPrefix} '${entityName}' (key: ${lockKey}) found on final SELECT with ID: ${finalRows[0].id}.`);
+                            successfullyResolved = true;
+                            promiseResolver(finalRows[0].id);
+                        } else {
+                            throw new Error(`Failed to re-fetch ${logPrefix} '${entityName}' (key: ${lockKey}) after duplicate key error during insert.`);
+                        }
+                    } catch (refetchError) {
+                        console.error(`Error in ${logPrefix} '${entityName}' (key: ${lockKey}) final select after duplicate: ${refetchError.message}`);
+                        promiseRejector(refetchError);
+                    }
+                } else {
+                    console.error(`Error in ${logPrefix} '${entityName}' (key: ${lockKey}) creation process: ${error.message}`);
+                    promiseRejector(error);
+                }
+            } finally {
+                // Only delete the lock if this specific promise instance failed AND it's still the one in the map
+                if (!successfullyResolved && this.entityCreationLocks.get(lockKey) === newPromise) {
+                    this.entityCreationLocks.delete(lockKey);
+                    console.log(`DEBUG: Lock for ${logPrefix} '${entityName}' (key: ${lockKey}) released due to failure or error.`);
+                } else if (successfullyResolved) {
+                    console.log(`DEBUG: Lock for ${logPrefix} '${entityName}' (key: ${lockKey}) effectively cached with resolved ID.`);
+                }
+                // If successfullyResolved is true, the promise (newPromise) remains in the map, acting as a cache.
+                // If successfullyResolved is false, but the promise in map is different, it means a new promise for the same key
+                // was created (which shouldn't happen with this logic), so we don't delete that newer one.
+            }
+        })();
+
+        return newPromise;
     }
 
     // Removed _ensureDefaultEntities method
@@ -181,31 +233,33 @@ class CsvImporter {
         }
     }
 
-    _handleStreamEnd(resolve, tempProcessedRows) {
-        this.processedRows = tempProcessedRows; // Assign to the class property
-        console.log(`Finished CSV parsing. Found ${this.processedRows.length} valid rows to import.`);
-        resolve();
+    async _handleStreamEnd(resolve, reject, tempProcessedRows, rowProcessingPromises) {
+        try {
+            await Promise.all(rowProcessingPromises);
+            this.processedRows = tempProcessedRows; // Assign after all promises resolved
+            console.log(`Finished CSV parsing. Found ${this.processedRows.length} valid rows to import.`);
+            resolve();
+        } catch (error) {
+            // This error would be from a promise in rowProcessingPromises rejecting.
+            // This should ideally not happen if _processRow and _handleStreamData handle their errors
+            // and don't let them propagate as rejections that Promise.all would catch.
+            // However, if it does, it's a critical failure in processing.
+            console.error('Critical error during Promise.all for row processing:', error.message);
+            reject(error); // Reject the main _processCsvFile promise
+        }
     }
 
     async _processCsvFile() {
         return new Promise((resolve, reject) => {
+            const rowProcessingPromises = [];
             const tempProcessedRows = [];
             fs.createReadStream(this.argv.csv_path)
                 .pipe(csv())
                 .on('data', (row) => {
-                    // Intentionally not awaiting _handleStreamData here to process rows concurrently
-                    // as much as the stream provides them. _handleStreamData itself is async.
-                    // Errors within _handleStreamData (and thus _processRow) are caught and logged there.
-                    // If one row processing fails, it logs and skips, doesn't stop the stream.
-                    this._handleStreamData(row, tempProcessedRows).catch(streamDataError => {
-                        // This catch is for errors if _handleStreamData itself throws an unhandled exception,
-                        // which is unlikely given its internal try/catch.
-                        console.error('Unexpected error from _handleStreamData in stream pipeline:', streamDataError.message);
-                        // Optionally, could call reject(streamDataError) here if such an error should stop all processing.
-                    });
+                    rowProcessingPromises.push(this._handleStreamData(row, tempProcessedRows));
                 })
                 .on('error', (err) => this._handleStreamError(err, reject))
-                .on('end', () => this._handleStreamEnd(resolve, tempProcessedRows));
+                .on('end', () => this._handleStreamEnd(resolve, reject, tempProcessedRows, rowProcessingPromises));
         });
     }
 
@@ -287,14 +341,14 @@ class CsvImporter {
             ];
 
             try {
-                // Using .query as established for operations that return data (like RETURNING id)
-                const result = await this.dbManager.query(sql, params);
-                if (result.rows && result.rows.length > 0 && result.rows[0].id) {
-                    console.log(`Successfully inserted expense ID: ${result.rows[0].id} for original date ${originalRow.Date}, amount ${originalRow.Amount}`);
+                // Use runCommand for INSERT statements. The 'sql' variable already includes 'RETURNING id'.
+                // runCommand should handle this and return { id: newId, changes: ... }
+                const insertResult = await this.dbManager.runCommand(sql, params);
+                if (insertResult && insertResult.id !== undefined) {
+                    console.log(`Successfully inserted expense ID: ${insertResult.id} for original date ${originalRow.Date}, amount ${originalRow.Amount}`);
                     successfulInserts++;
                 } else {
-                    // This case might occur if RETURNING id is not supported/configured correctly or if the insert somehow succeeds without error but returns no rows.
-                    console.warn(`Expense insertion for original row ${JSON.stringify(originalRow)} may have succeeded but did not return an ID. Consider it failed for accounting.`);
+                    console.warn(`Expense insertion for original row ${JSON.stringify(originalRow)} may have succeeded but did not return an ID (or id was undefined). Consider it failed for accounting.`);
                     failedInserts++;
                 }
             } catch (error) {
