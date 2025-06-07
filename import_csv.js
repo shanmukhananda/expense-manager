@@ -133,6 +133,42 @@ class CsvImporter {
         return this._findOrCreateEntity('expense_categories', categoryName, 'name', 'Category');
     }
 
+    _parseDate(dateStr, originalRowForRowContext) { // Added originalRow for context in logging
+        if (!dateStr || String(dateStr).trim() === '') { // Handle empty or null date strings early
+            console.warn(`Skipping row due to missing or empty Date field:`, originalRowForRowContext);
+            return null; // Or throw new Error('Date field is missing');
+        }
+        const dateParts = String(dateStr).split('-'); // Ensure dateStr is a string
+        if (dateParts.length === 3) {
+            const day = dateParts[0].padStart(2, '0');
+            const monthNames = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
+            const month = monthNames[dateParts[1]];
+            const year = dateParts[2];
+            if (month && day.length === 2 && /^\d{4}$/.test(year) && /^\d{2}$/.test(day) && parseInt(day, 10) > 0 && parseInt(day, 10) <= 31 && parseInt(month, 10) > 0 && parseInt(month, 10) <=12 ) {
+                return `${year}-${month}-${day}`;
+            } else {
+                console.warn(`Skipping row due to invalid date components: ${dateStr}`, originalRowForRowContext);
+                return null;
+            }
+        } else {
+            console.warn(`Skipping row due to invalid date format (expected DD-Mon-YYYY): ${dateStr}`, originalRowForRowContext);
+            return null;
+        }
+    }
+
+    _parseAmount(amountStr, originalRowForRowContext) { // Added originalRow for context
+        if (!amountStr || String(amountStr).trim() === '') { // Handle empty or null amount strings
+            console.warn(`Skipping row due to missing or empty Amount field:`, originalRowForRowContext);
+            return null; // Or throw an error
+        }
+        const numericAmount = parseFloat(String(amountStr).trim()); // Ensure string and trim
+        if (isNaN(numericAmount)) {
+            console.warn(`Skipping row due to invalid amount: ${amountStr}`, originalRowForRowContext);
+            return null;
+        }
+        return numericAmount;
+    }
+
     async _processRow(row) {
         try {
             // Adjust to new CSV column names
@@ -144,6 +180,8 @@ class CsvImporter {
             const payerStr = row['Payer'];
             const modeStr = row['Payment mode'];
 
+            // Preliminary check for presence of required column headers
+            // Specific parsing methods will handle content validation (empty, format)
             const requiredFields = {
                 'Date': dateStr,
                 'Amount': amountStr,
@@ -152,40 +190,40 @@ class CsvImporter {
                 'Payer': payerStr,
                 'Payment mode': modeStr
             };
-
             for (const fieldName in requiredFields) {
-                // Check for null, undefined, or empty string after trimming
-                if (requiredFields[fieldName] == null || String(requiredFields[fieldName]).trim() === '') {
-                    console.warn(`Skipping row due to missing or empty required field '${fieldName}':`, row);
+                if (requiredFields[fieldName] === undefined) { // Check if header itself is missing
+                    console.warn(`Skipping row due to missing column header '${fieldName}':`, row);
                     return null;
                 }
             }
 
-            let formattedDate;
-            const dateParts = dateStr.split('-');
-            if (dateParts.length === 3) {
-                const day = dateParts[0].padStart(2, '0');
-                const monthNames = { Jan: '01', Feb: '02', Mar: '03', Apr: '04', May: '05', Jun: '06', Jul: '07', Aug: '08', Sep: '09', Oct: '10', Nov: '11', Dec: '12' };
-                const month = monthNames[dateParts[1]];
-                const year = dateParts[2];
-                if (month && day.length === 2 && year.length === 4) {
-                    formattedDate = `${year}-${month}-${day}`;
-                } else {
-                    console.warn(`Skipping row due to invalid date components: ${dateStr}`, row);
-                    return null;
-                }
-            } else {
-                console.warn(`Skipping row due to invalid date format: ${dateStr}`, row);
+            const formattedDate = this._parseDate(dateStr, row);
+            if (!formattedDate) return null;
+
+            const numericAmount = this._parseAmount(amountStr, row);
+            if (numericAmount === null) return null; // 0 is a valid amount
+
+            // Check for other required string fields after attempting to parse date/amount
+            // as parseDate/parseAmount handle their own missing/empty logging.
+             if (!categoryStr || String(categoryStr).trim() === '') {
+                console.warn(`Skipping row due to missing or empty required field 'Expense Category':`, row);
+                return null;
+            }
+            if (!groupStr || String(groupStr).trim() === '') {
+                console.warn(`Skipping row due to missing or empty required field 'Expense Group':`, row);
+                return null;
+            }
+            if (!payerStr || String(payerStr).trim() === '') {
+                console.warn(`Skipping row due to missing or empty required field 'Payer':`, row);
+                return null;
+            }
+            if (!modeStr || String(modeStr).trim() === '') {
+                console.warn(`Skipping row due to missing or empty required field 'Payment mode':`, row);
                 return null;
             }
 
-            const numericAmount = parseFloat(amountStr);
-            if (isNaN(numericAmount)) {
-                console.warn(`Skipping row due to invalid amount: ${amountStr}`, row);
-                return null;
-            }
 
-            const categoryId = await this._findOrCreateCategory(categoryStr); // Uses 'Expense Category'
+            const categoryId = await this._findOrCreateCategory(categoryStr);
             const expenseGroupId = await this._findOrCreateEntity('expense_groups', groupStr, 'name', 'Expense Group');
             const payerId = await this._findOrCreateEntity('payers', payerStr, 'name', 'Payer');
             const paymentModeId = await this._findOrCreateEntity('payment_mode', modeStr, 'name', 'Payment Mode');
@@ -213,18 +251,21 @@ class CsvImporter {
         }
     }
 
-    _handleStreamError(error, reject) {
-        console.error('Error during CSV stream processing:', error.message);
-        reject(error);
+    _onStreamData(row) {
+        // _currentTempProcessedRows will be used by _handleStreamData (now modified)
+        // _currentRowProcessingPromises will be populated by this call
+        this._currentRowProcessingPromises.push(
+            this._handleStreamData(row) // _handleStreamData will use this._currentTempProcessedRows
+        );
     }
 
-    async _handleStreamData(row, tempProcessedRows) {
+    async _handleStreamData(row) { // Removed tempProcessedRows parameter
         // This wrapper is to ensure that if _processRow itself has an unhandled async error,
         // it doesn't crash the stream data handler directly.
         try {
             const processed = await this._processRow(row);
             if (processed) {
-                tempProcessedRows.push(processed);
+                this._currentTempProcessedRows.push(processed); // Use instance property
             }
         } catch (err) {
             // This catch is for unexpected errors from _processRow if it wasn't fully catching its own errors.
@@ -233,33 +274,37 @@ class CsvImporter {
         }
     }
 
-    async _handleStreamEnd(resolve, reject, tempProcessedRows, rowProcessingPromises) {
+    _onStreamError(rejectPromise, err) { // Parameters order convention: bound args first, then event args
+        console.error('Error during CSV stream processing:', err.message);
+        rejectPromise(err);
+    }
+
+    async _onStreamEnd(resolvePromise, rejectPromise) { // Renamed parameters for clarity
         try {
-            await Promise.all(rowProcessingPromises);
-            this.processedRows = tempProcessedRows; // Assign after all promises resolved
+            await Promise.all(this._currentRowProcessingPromises); // Use instance property
+            this.processedRows = this._currentTempProcessedRows; // Assign after all promises resolved & use instance property
             console.log(`Finished CSV parsing. Found ${this.processedRows.length} valid rows to import.`);
-            resolve();
+            resolvePromise();
         } catch (error) {
-            // This error would be from a promise in rowProcessingPromises rejecting.
-            // This should ideally not happen if _processRow and _handleStreamData handle their errors
-            // and don't let them propagate as rejections that Promise.all would catch.
-            // However, if it does, it's a critical failure in processing.
             console.error('Critical error during Promise.all for row processing:', error.message);
-            reject(error); // Reject the main _processCsvFile promise
+            rejectPromise(error);
+        } finally {
+            // Cleanup instance properties
+            this._currentRowProcessingPromises = [];
+            this._currentTempProcessedRows = [];
+            console.log("DEBUG: Temporary stream processing arrays have been cleared.");
         }
     }
 
     async _processCsvFile() {
+        this._currentRowProcessingPromises = []; // Initialize instance property
+        this._currentTempProcessedRows = [];   // Initialize instance property
+
         return new Promise((resolve, reject) => {
-            const rowProcessingPromises = [];
-            const tempProcessedRows = [];
-            fs.createReadStream(this.argv.csv_path)
-                .pipe(csv())
-                .on('data', (row) => {
-                    rowProcessingPromises.push(this._handleStreamData(row, tempProcessedRows));
-                })
-                .on('error', (err) => this._handleStreamError(err, reject))
-                .on('end', () => this._handleStreamEnd(resolve, reject, tempProcessedRows, rowProcessingPromises));
+            const stream = fs.createReadStream(this.argv.csv_path).pipe(csv());
+            stream.on('data', this._onStreamData.bind(this));
+            stream.on('error', this._onStreamError.bind(this, reject)); // Pass reject from new Promise
+            stream.on('end', this._onStreamEnd.bind(this, resolve, reject)); // Pass resolve, reject
         });
     }
 
