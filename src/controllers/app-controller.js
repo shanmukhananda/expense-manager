@@ -3,6 +3,10 @@
 import { ApiService } from '../services/api-service.js';
 import { UIManager } from '../views/ui.js';
 import { AnalyticsManager } from './analytics-controller.js';
+import { DatabaseManager } from '../services/db-manager.js'; // Assuming path
+import { ExpenseRepository } from '../services/expense-repository.js'; // Assuming path
+import { CsvImporter } from '../services/csv-importer.js';
+import { CsvExporter } from '../services/csv-exporter.js';
 
 /**
  * Main application class to manage state and orchestrate interactions.
@@ -11,13 +15,26 @@ import { AnalyticsManager } from './analytics-controller.js';
  */
 class App {
     constructor() {
-        this.api = new ApiService();
+        this.api = new ApiService(); // ApiService likely uses DatabaseManager and Repositories internally
         this.ui = new UIManager();
+        this.ui.appController = this; // Set AppController instance on UIManager
+
+        // DatabaseManager and ExpenseRepository might be managed by ApiService or instantiated here
+        // For this task, we instantiate them here to fulfill CsvImporter/Exporter constructor requirements.
+        // In a real app, this might be handled differently (e.g., ApiService provides these).
+        this.dbManager = new DatabaseManager(this.api.getDbConnection.bind(this.api)); // Or however db connection is obtained
+        this.expenseRepository = new ExpenseRepository(this.dbManager);
+
+        this.csvImporter = new CsvImporter(this.dbManager, this.expenseRepository);
+        this.csvExporter = new CsvExporter(this.expenseRepository);
+
         this.activeTabId = null; // Initialize activeTabId
         this.analyticsManager = new AnalyticsManager(
             this.ui,
             this.ui.elements.analyticsFiltersContainer,
-            this.ui.elements.analyticsResultsContainer
+            this.ui.elements.analyticsResultsContainer,
+            this.csvImporter,
+            this.csvExporter
         );
 
         this.dbConnected = false;

@@ -96,6 +96,173 @@ class ExpenseRepository {
         }
     }
 
+    // --- findOrCreate methods ---
+
+    async findOrCreateCategory(name) {
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            console.error('Invalid name provided for findOrCreateCategory:', name);
+            // In CsvImporter, we return an error object, but here we throw,
+            // CsvImporter's _processRow will catch it and form the error object.
+            throw new Error('Category name must be a non-empty string.');
+        }
+        const trimmedName = name.trim();
+        try {
+            let result = await this.dbManager.runQuery('SELECT id FROM expense_categories WHERE name = $1', [trimmedName]);
+            if (result.length > 0) {
+                return { id: result[0].id, name: trimmedName };
+            } else {
+                // Insert if not found
+                // runCommand for INSERT/UPDATE/DELETE typically returns { changes: number, lastID: number (for inserts) }
+                // or similar based on the db driver wrapper in dbManager.
+                // We need the ID. If lastID is not directly returned, RETURNING id is crucial.
+                const insertResultRows = await this.dbManager.runQuery('INSERT INTO expense_categories (name) VALUES ($1) RETURNING id', [trimmedName]);
+                if (insertResultRows.length > 0 && typeof insertResultRows[0].id !== 'undefined') {
+                    return { id: insertResultRows[0].id, name: trimmedName };
+                } else {
+                    // This block might be hit if RETURNING id is not supported/configured correctly OR if insert failed silently (unlikely for INSERT)
+                    console.warn(`Category '${trimmedName}' not found after insert attempt (or ID not returned), re-querying.`);
+                    result = await this.dbManager.runQuery('SELECT id FROM expense_categories WHERE name = $1', [trimmedName]);
+                    if (result.length > 0) {
+                        return { id: result[0].id, name: trimmedName };
+                    }
+                    throw new Error(`Failed to create or find category '${trimmedName}' after insert attempt.`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error in findOrCreateCategory for '${trimmedName}':`, error);
+            // Check for unique constraint violation (specific error code depends on DB, e.g., '23505' for PostgreSQL)
+            if (error.code === '23505') { // Example for PostgreSQL unique violation
+                console.warn(`Unique constraint violation for category '${trimmedName}', attempting to re-fetch.`);
+                const result = await this.dbManager.runQuery('SELECT id FROM expense_categories WHERE name = $1', [trimmedName]);
+                if (result.length > 0) {
+                    return { id: result[0].id, name: trimmedName };
+                }
+            }
+            throw error; // Re-throw if not a known race condition or if re-fetch fails
+        }
+    }
+
+    async findOrCreateExpenseGroup(name) {
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            // For optional fields in CSV importer, this check might be too strict if an empty string implies "no group"
+            // CsvImporter handles empty strings by not calling this, or passing null.
+            // If it can be called with null/empty for "no entity", it should return null.
+            // For now, assuming name is expected if called.
+             console.warn('Empty or invalid name provided for findOrCreateExpenseGroup, returning null.');
+             return null; // Or throw new Error('Expense Group name must be a non-empty string.');
+        }
+        const trimmedName = name.trim();
+        if (trimmedName === '') return null; // Explicitly return null if trimmed name is empty
+
+        try {
+            let result = await this.dbManager.runQuery('SELECT id FROM expense_groups WHERE name = $1', [trimmedName]);
+            if (result.length > 0) {
+                return { id: result[0].id, name: trimmedName };
+            } else {
+                const insertResultRows = await this.dbManager.runQuery('INSERT INTO expense_groups (name) VALUES ($1) RETURNING id', [trimmedName]);
+                if (insertResultRows.length > 0 && typeof insertResultRows[0].id !== 'undefined') {
+                    return { id: insertResultRows[0].id, name: trimmedName };
+                } else {
+                    console.warn(`Expense Group '${trimmedName}' not found after insert attempt, re-querying.`);
+                    result = await this.dbManager.runQuery('SELECT id FROM expense_groups WHERE name = $1', [trimmedName]);
+                    if (result.length > 0) {
+                        return { id: result[0].id, name: trimmedName };
+                    }
+                    throw new Error(`Failed to create or find Expense Group '${trimmedName}' after insert attempt.`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error in findOrCreateExpenseGroup for '${trimmedName}':`, error);
+            if (error.code === '23505') {
+                console.warn(`Unique constraint violation for Expense Group '${trimmedName}', attempting to re-fetch.`);
+                const result = await this.dbManager.runQuery('SELECT id FROM expense_groups WHERE name = $1', [trimmedName]);
+                if (result.length > 0) {
+                    return { id: result[0].id, name: trimmedName };
+                }
+            }
+            throw error;
+        }
+    }
+
+    async findOrCreatePayer(name) {
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            console.warn('Empty or invalid name provided for findOrCreatePayer, returning null.');
+            return null;
+        }
+        const trimmedName = name.trim();
+        if (trimmedName === '') return null;
+
+        try {
+            let result = await this.dbManager.runQuery('SELECT id FROM payers WHERE name = $1', [trimmedName]);
+            if (result.length > 0) {
+                return { id: result[0].id, name: trimmedName };
+            } else {
+                const insertResultRows = await this.dbManager.runQuery('INSERT INTO payers (name) VALUES ($1) RETURNING id', [trimmedName]);
+                if (insertResultRows.length > 0 && typeof insertResultRows[0].id !== 'undefined') {
+                    return { id: insertResultRows[0].id, name: trimmedName };
+                } else {
+                    console.warn(`Payer '${trimmedName}' not found after insert attempt, re-querying.`);
+                    result = await this.dbManager.runQuery('SELECT id FROM payers WHERE name = $1', [trimmedName]);
+                    if (result.length > 0) {
+                        return { id: result[0].id, name: trimmedName };
+                    }
+                    throw new Error(`Failed to create or find Payer '${trimmedName}' after insert attempt.`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error in findOrCreatePayer for '${trimmedName}':`, error);
+            if (error.code === '23505') {
+                console.warn(`Unique constraint violation for Payer '${trimmedName}', attempting to re-fetch.`);
+                const result = await this.dbManager.runQuery('SELECT id FROM payers WHERE name = $1', [trimmedName]);
+                if (result.length > 0) {
+                    return { id: result[0].id, name: trimmedName };
+                }
+            }
+            throw error;
+        }
+    }
+
+    async findOrCreatePaymentMode(name) {
+        // Table name is 'payment_mode'
+        if (!name || typeof name !== 'string' || name.trim() === '') {
+            console.warn('Empty or invalid name provided for findOrCreatePaymentMode, returning null.');
+            return null;
+        }
+        const trimmedName = name.trim();
+        if (trimmedName === '') return null;
+
+        try {
+            let result = await this.dbManager.runQuery('SELECT id FROM payment_mode WHERE name = $1', [trimmedName]);
+            if (result.length > 0) {
+                return { id: result[0].id, name: trimmedName };
+            } else {
+                const insertResultRows = await this.dbManager.runQuery('INSERT INTO payment_mode (name) VALUES ($1) RETURNING id', [trimmedName]);
+                if (insertResultRows.length > 0 && typeof insertResultRows[0].id !== 'undefined') {
+                    return { id: insertResultRows[0].id, name: trimmedName };
+                } else {
+                    console.warn(`Payment Mode '${trimmedName}' not found after insert attempt, re-querying.`);
+                    result = await this.dbManager.runQuery('SELECT id FROM payment_mode WHERE name = $1', [trimmedName]);
+                    if (result.length > 0) {
+                        return { id: result[0].id, name: trimmedName };
+                    }
+                    throw new Error(`Failed to create or find Payment Mode '${trimmedName}' after insert attempt.`);
+                }
+            }
+        } catch (error) {
+            console.error(`Error in findOrCreatePaymentMode for '${trimmedName}':`, error);
+            if (error.code === '23505') {
+                console.warn(`Unique constraint violation for Payment Mode '${trimmedName}', attempting to re-fetch.`);
+                const result = await this.dbManager.runQuery('SELECT id FROM payment_mode WHERE name = $1', [trimmedName]);
+                if (result.length > 0) {
+                    return { id: result[0].id, name: trimmedName };
+                }
+            }
+            throw error;
+        }
+    }
+
+    // --- End of findOrCreate methods ---
+
     async getAnalyticsData(filters = {}) {
         let overallTotal = 0;
         let totalFilteredCount = 0;

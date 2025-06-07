@@ -86,6 +86,11 @@ export class UIManager {
             dbConnectionString: document.getElementById('db-connection-string'),
             dbConnectToggle: document.getElementById('db-connect-toggle'),
             dbConnectionStatusMessage: null, // Will be created dynamically
+
+            // CSV Import/Export elements
+            importCsvBtn: document.getElementById('import-csv-btn'),
+            exportCsvBtn: document.getElementById('export-csv-btn'),
+            csvFileInput: document.getElementById('csv-file-input'),
         };
     }
 
@@ -109,6 +114,52 @@ export class UIManager {
             this.elements.dbConnectToggle.addEventListener('click', () => {
                 if (this.onConnectToggle) {
                     this.onConnectToggle();
+                }
+            });
+        }
+
+        this._setupCsvButtonListeners();
+    }
+
+    /**
+     * Sets up event listeners for CSV import/export buttons.
+     * Assumes this.appController is set before these are used.
+     * @private
+     */
+    _setupCsvButtonListeners() {
+        if (this.elements.importCsvBtn && this.elements.csvFileInput) {
+            this.elements.importCsvBtn.addEventListener('click', () => {
+                this.elements.csvFileInput.click(); // Trigger hidden file input
+            });
+
+            this.elements.csvFileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    if (file.name.endsWith('.csv') || file.type === 'text/csv') {
+                        if (this.appController && this.appController.analyticsManager && typeof this.appController.analyticsManager.importCsv === 'function') {
+                            // Pass the file object. AnalyticsManager's importCsv will call CsvImporter.
+                            // CsvImporter might need adaptation if it strictly expects a file path.
+                            // For now, we pass the file object as it's standard in browser environments.
+                            this.appController.analyticsManager.importCsv(file);
+                        } else {
+                            console.error('AnalyticsManager or importCsv method not available.');
+                            this.showInfoModal('Error', 'CSV import functionality is not properly configured.');
+                        }
+                    } else {
+                        this.showInfoModal('Invalid File', 'Please select a valid .csv file.');
+                    }
+                    event.target.value = null; // Reset file input
+                }
+            });
+        }
+
+        if (this.elements.exportCsvBtn) {
+            this.elements.exportCsvBtn.addEventListener('click', () => {
+                if (this.appController && this.appController.analyticsManager && typeof this.appController.analyticsManager.exportCsv === 'function') {
+                    this.appController.analyticsManager.exportCsv();
+                } else {
+                    console.error('AnalyticsManager or exportCsv method not available.');
+                    this.showInfoModal('Error', 'CSV export functionality is not properly configured.');
                 }
             });
         }
@@ -253,6 +304,13 @@ export class UIManager {
      * @type {function(): Promise<void>}
      */
     onConnectToggle = async () => {};
+
+    /**
+     * Reference to the AppController. This needs to be set by AppController itself
+     * after UIManager is instantiated.
+     * @type {AppController|null}
+     */
+    appController = null;
 
     /**
      * Attaches add button listeners. This is called by the App class

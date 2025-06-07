@@ -1,4 +1,6 @@
 // src/controllers/analytics-controller.js
+import { CsvImporter } from '../services/csv-importer.js';
+import { CsvExporter } from '../services/csv-exporter.js';
 
 export class AnalyticsManager {
     /**
@@ -6,11 +8,15 @@ export class AnalyticsManager {
      * @param {UIManager} uiManager - Instance of UIManager for generic UI tasks (e.g., modals).
      * @param {HTMLElement} filtersContainer - The DOM element to host filter controls.
      * @param {HTMLElement} resultsContainer - The DOM element to display analytics results.
+     * @param {CsvImporter} csvImporter - Instance of CsvImporter.
+     * @param {CsvExporter} csvExporter - Instance of CsvExporter.
      */
-    constructor(uiManager, filtersContainer, resultsContainer) {
+    constructor(uiManager, filtersContainer, resultsContainer, csvImporter, csvExporter) {
         this.uiManager = uiManager; // For modals or other shared UI functions
         this.filtersContainer = filtersContainer;
         this.resultsContainer = resultsContainer;
+        this.csvImporter = csvImporter;
+        this.csvExporter = csvExporter;
 
         // These will store references to dynamically created/managed elements within the containers
         this.elements = {
@@ -277,6 +283,92 @@ export class AnalyticsManager {
                 this.uiManager.renderExpenses(analyticsData.filteredExpenses, expenseListContainer, editCallback, deleteCallback);
             } else if (expenseListContainer) {
                 expenseListContainer.innerHTML = "<p class='text-red-500 p-2'>Error: UI manager could not render expense details here.</p>";
+            }
+        }
+    }
+
+    async importCsv(filePath) {
+        if (!this.csvImporter) {
+            const message = "CSV Importer is not available.";
+            console.error(message);
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(message, 'error');
+            }
+            return;
+        }
+
+        try {
+            // In a browser environment, filePath would likely come from an <input type="file">
+            // For now, assuming filePath is a string path accessible by the importer.
+            // If CsvImporter handles file objects directly, this might need adjustment
+            // based on how filePath is obtained (e.g., from an event).
+            console.log(`AnalyticsManager: Starting CSV import from ${filePath}...`);
+            const result = await this.csvImporter.importCsv(filePath);
+            const successMessage = result.message || "CSV imported successfully.";
+            console.log(successMessage, result.errors || '');
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(successMessage, 'success');
+                if (result.errors && result.errors.length > 0) {
+                    this.uiManager.showNotification(`Import completed with errors: ${result.errors.join(', ')}`, 'warning');
+                }
+            }
+            // Optionally, trigger a data refresh or UI update here
+        } catch (error) {
+            const errorMessage = error.message || "An unknown error occurred during CSV import.";
+            console.error("CSV Import failed:", errorMessage, error.errors || '');
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(`CSV Import failed: ${errorMessage}`, 'error');
+                if (error.errors && error.errors.length > 0) {
+                     this.uiManager.showNotification(`Details: ${error.errors.join(', ')}`, 'error');
+                }
+            }
+        }
+    }
+
+    async exportCsv() {
+        if (!this.csvExporter) {
+            const message = "CSV Exporter is not available.";
+            console.error(message);
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(message, 'error');
+            }
+            return;
+        }
+
+        try {
+            console.log("AnalyticsManager: Starting CSV export...");
+            const csvString = await this.csvExporter.exportCsv();
+
+            // Trigger download
+            const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            if (link.download !== undefined) { // Feature detection
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `expenses-export-${new Date().toISOString().split('T')[0]}.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+            } else {
+                // Fallback for older browsers (less common now)
+                console.warn("Direct download not supported, CSV content logged to console.");
+                console.log(csvString);
+                 if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                    this.uiManager.showNotification("Direct download not fully supported by your browser. CSV logged to console.", 'warning');
+                }
+            }
+            const successMessage = "CSV exported successfully and download initiated.";
+            console.log(successMessage);
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(successMessage, 'success');
+            }
+        } catch (error) {
+            const errorMessage = error.message || "An unknown error occurred during CSV export.";
+            console.error("CSV Export failed:", errorMessage);
+            if (this.uiManager && typeof this.uiManager.showNotification === 'function') {
+                this.uiManager.showNotification(`CSV Export failed: ${errorMessage}`, 'error');
             }
         }
     }
