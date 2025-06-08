@@ -56,63 +56,89 @@ export class AnalyticsManager {
         }
     }
 
+    _renderDateRangeFilter() {
+        return `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Date Range</h4>
+                <div class="space-y-2">
+                    <div>
+                        <label for="analytics-start-date" class="block text-sm font-medium text-gray-700">Start Date:</label>
+                        <input type="date" id="analytics-start-date" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <div>
+                        <label for="analytics-end-date" class="block text-sm font-medium text-gray-700">End Date:</label>
+                        <input type="date" id="analytics-end-date" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
+                    </div>
+                    <button id="analytics-all-time-btn" class="mt-2 w-full text-sm text-blue-600 hover:text-blue-800 focus:outline-none">All Time</button>
+                </div>
+            </div>
+        `;
+    }
+
+    _renderCategoryFilter(categories = []) {
+        return `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Categories</h4>
+                <select id="analytics-category-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                    <option value="">All Categories</option>
+                    ${categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('')}
+                </select>
+            </div>
+        `;
+    }
+
+    _renderPaymentModeFilter(paymentModes = []) {
+        return `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Payment Modes</h4>
+                <select id="analytics-payment-mode-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                    <option value="">All Payment Modes</option>
+                    ${paymentModes.map(pm => `<option value="${pm.id}">${pm.name}</option>`).join('')}
+                </select>
+            </div>
+        `;
+    }
+
+    _renderGroupFilter(groups = []) {
+        return `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
+                <select id="analytics-group-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                    <option value="">All Groups</option>
+                    ${groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('')}
+                </select>
+            </div>
+        `;
+    }
+
+    _renderPayerFilter(payers = []) {
+        return `
+            <div class="bg-white p-4 rounded-lg shadow">
+                <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
+                <select id="analytics-payer-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
+                    <option value="">All Payers</option>
+                    ${payers.map(payer => `<option value="${payer.id}">${payer.name}</option>`).join('')}
+                </select>
+            </div>
+        `;
+    }
+
     renderAnalyticsFilters(masterData, applyFiltersCallback) {
         this.filtersContainer.innerHTML = ''; // Clear previous filters
 
-        // Adjusted grid to better accommodate more filters: grid-cols-1 sm:grid-cols-2 lg:grid-cols-3
+        const dateRangeHTML = this._renderDateRangeFilter();
+        const categoryHTML = this._renderCategoryFilter(masterData.categories);
+        const paymentModeHTML = this._renderPaymentModeFilter(masterData.paymentModes);
+        const groupHTML = this._renderGroupFilter(masterData.groups);
+        const payerHTML = this._renderPayerFilter(masterData.payers);
+
         const filtersHTML = `
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-6">
-                <!-- Date Range Section -->
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Date Range</h4>
-                    <div class="space-y-2">
-                        <div>
-                            <label for="analytics-start-date" class="block text-sm font-medium text-gray-700">Start Date:</label>
-                            <input type="date" id="analytics-start-date" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <div>
-                            <label for="analytics-end-date" class="block text-sm font-medium text-gray-700">End Date:</label>
-                            <input type="date" id="analytics-end-date" class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500">
-                        </div>
-                        <button id="analytics-all-time-btn" class="mt-2 w-full text-sm text-blue-600 hover:text-blue-800 focus:outline-none">All Time</button>
-                    </div>
-                </div>
-
-                <!-- Category Filter Section -->
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Categories</h4>
-                    <select id="analytics-category-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                        <option value="">All Categories</option>
-                        ${masterData.categories && masterData.categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('')}
-                    </select>
-                </div>
-
-                <!-- Payment Mode Filter Section -->
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Payment Modes</h4>
-                    <select id="analytics-payment-mode-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                        <option value="">All Payment Modes</option>
-                        ${masterData.paymentModes && masterData.paymentModes.map(pm => `<option value="${pm.id}">${pm.name}</option>`).join('')}
-                    </select>
-                </div>
-
-                <!-- Expense Group Filter Section -->
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
-                    <select id="analytics-group-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                        <option value="">All Groups</option>
-                        ${masterData.groups && masterData.groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('')}
-                    </select>
-                </div>
-
-                <!-- Payer Filter Section -->
-                <div class="bg-white p-4 rounded-lg shadow">
-                    <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
-                    <select id="analytics-payer-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                        <option value="">All Payers</option>
-                        ${masterData.payers && masterData.payers.map(payer => `<option value="${payer.id}">${payer.name}</option>`).join('')}
-                    </select>
-                </div>
+                ${dateRangeHTML}
+                ${categoryHTML}
+                ${paymentModeHTML}
+                ${groupHTML}
+                ${payerHTML}
             </div>
             <div class="flex justify-end mt-4">
                 <button id="analytics-apply-filters-btn" class="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded-lg shadow-md transition duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75">Apply Filters</button>
@@ -120,7 +146,6 @@ export class AnalyticsManager {
         `;
 
         this.filtersContainer.innerHTML = filtersHTML;
-
         this._cacheFilterElements();
 
         if (this.elements.endDateInput && this.elements.startDateInput) {
@@ -184,6 +209,66 @@ export class AnalyticsManager {
         };
     }
 
+    _renderSummarySection(overallTotal, totalFilteredCount) {
+        return `
+            <div class="mb-6 p-4 bg-white shadow rounded-lg">
+                <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
+                <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
+            </div>
+        `;
+    }
+
+    _renderCategoryBreakdownTable(categoryBreakdown) {
+        if (!categoryBreakdown || categoryBreakdown.length === 0) {
+            return ''; // Or a message like "<p>No category breakdown available.</p>" if preferred
+        }
+
+        let tableRowsHTML = '';
+        categoryBreakdown.forEach(item => {
+            const categoryName = item.categoryName || 'Unnamed Category';
+            const itemTotalAmountDisplay = (parseFloat(item.totalAmount) || 0).toFixed(2);
+            const itemPercentageDisplay = (parseFloat(item.percentage) || 0).toFixed(2);
+            tableRowsHTML += `
+                <tr>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${categoryName}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemTotalAmountDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemPercentageDisplay}%</td>
+                </tr>
+            `;
+        });
+
+        return `
+            <h4 class="text-lg font-semibold text-gray-800 mb-2">Category Breakdown</h4>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-200 border border-gray-200 shadow-sm rounded-lg">
+                    <thead class="bg-gray-100">
+                        <tr>
+                            <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Category</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Total Amount</th>
+                            <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Percentage</th>
+                        </tr>
+                    </thead>
+                    <tbody class="bg-white divide-y divide-gray-200">
+                        ${tableRowsHTML}
+                    </tbody>
+                </table>
+            </div>
+        `;
+    }
+
+    _renderFilteredExpensesSection(filteredExpenses) {
+        if (!filteredExpenses || filteredExpenses.length === 0) {
+            return ''; // Or a message if preferred
+        }
+        return `
+            <h4 class="text-lg font-semibold text-gray-800 mt-6 mb-2">Filtered Expense Details (${filteredExpenses.length})</h4>
+            <div id="analytics-filtered-expenses-list" class="max-h-[32rem] overflow-y-auto border border-gray-200 rounded-lg shadow-inner p-1 bg-gray-50 space-y-3">
+                <!-- Expense items will be rendered here by UIManager -->
+            </div>
+        `;
+    }
+
     renderAnalyticsResults(analyticsData) {
         this.resultsContainer.innerHTML = ''; // Clear previous results
 
@@ -195,7 +280,6 @@ export class AnalyticsManager {
         const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
         const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
 
-        // Check if there's absolutely nothing to show
         if (totalFilteredCount === 0 &&
             (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
             (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
@@ -203,75 +287,25 @@ export class AnalyticsManager {
             return;
         }
 
-        let resultsHTML = `
-            <div class="mb-6 p-4 bg-white shadow rounded-lg">
-                <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
-                <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
-                <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
-            </div>
-        `;
-
-        if (analyticsData.categoryBreakdown && analyticsData.categoryBreakdown.length > 0) {
-            resultsHTML += `
-                <h4 class="text-lg font-semibold text-gray-800 mb-2">Category Breakdown</h4>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200 border border-gray-200 shadow-sm rounded-lg">
-                        <thead class="bg-gray-100">
-                            <tr>
-                                <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-600 uppercase tracking-wider">Category</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Total Amount</th>
-                                <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-600 uppercase tracking-wider">Percentage</th>
-                            </tr>
-                        </thead>
-                        <tbody class="bg-white divide-y divide-gray-200">
-            `;
-
-            analyticsData.categoryBreakdown.forEach(item => {
-                const categoryName = item.categoryName || 'Unnamed Category';
-                const itemTotalAmountDisplay = (parseFloat(item.totalAmount) || 0).toFixed(2);
-                const itemPercentageDisplay = (parseFloat(item.percentage) || 0).toFixed(2);
-                resultsHTML += `
-                    <tr>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${categoryName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemTotalAmountDisplay}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 text-right">${itemPercentageDisplay}%</td>
-                    </tr>
-                `;
-            });
-
-            resultsHTML += `
-                        </tbody>
-                    </table>
-                </div>
-            `;
-        } else if (totalFilteredCount > 0 && (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
-            // Only show this if there are no individual expenses to list either
-            resultsHTML += '<p class="text-gray-500 text-center py-4 mt-4">No category-specific data to display for the selection.</p>';
-        }
+        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount);
+        resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
         
-        // Section for filtered expense details
-        if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
-            resultsHTML += `
-                <h4 class="text-lg font-semibold text-gray-800 mt-6 mb-2">Filtered Expense Details (${analyticsData.filteredExpenses.length})</h4>
-                <div id="analytics-filtered-expenses-list" class="max-h-[32rem] overflow-y-auto border border-gray-200 rounded-lg shadow-inner p-1 bg-gray-50 space-y-3">
-                    <!-- Expense items will be rendered here by UIManager -->
-                </div>
-            `;
-        } else if (totalFilteredCount > 0 && (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0)) {
-             // This case is tricky. If totalFilteredCount > 0, but no breakdown and no individual list,
-             // it implies data exists but isn't being displayed in detail.
-             // The message above for "No category-specific data" might cover it if filteredExpenses is also empty.
-             // For now, if there's a total count but no expenses list, we'll assume the category message is enough or no explicit message needed here.
+        // Add a message if there's a total count, but no category breakdown AND no filtered expenses to list.
+        // This covers a specific edge case.
+        if (totalFilteredCount > 0 &&
+            (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
+            (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
+            resultsHTML += '<p class="text-gray-500 text-center py-4 mt-4">No detailed data (category or individual expenses) to display for the selection.</p>';
         }
 
+        resultsHTML += this._renderFilteredExpensesSection(analyticsData.filteredExpenses);
 
-        this.resultsContainer.innerHTML = resultsHTML; // Set the HTML structure
+        this.resultsContainer.innerHTML = resultsHTML;
 
-        // Now, if the container for filtered expenses was added, populate it.
+        // Populate filtered expenses list
         if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
             const expenseListContainer = this.resultsContainer.querySelector('#analytics-filtered-expenses-list');
             if (expenseListContainer && this.uiManager && typeof this.uiManager.renderExpenses === 'function') {
-                // Pass null for callbacks if they are not set, UIManager.renderExpenses should handle this
                 const editCallback = this.onEditExpense || null;
                 const deleteCallback = this.onDeleteExpense || null;
                 this.uiManager.renderExpenses(analyticsData.filteredExpenses, expenseListContainer, editCallback, deleteCallback);

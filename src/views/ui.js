@@ -549,10 +549,7 @@ export class UIManager {
      * @param {function(number): Promise<void>|null} onDeleteCallback - Callback for delete action.
      * @returns {HTMLElement} The created div element.
      */
-    _createExpenseListItem(exp, onEditCallback, onDeleteCallback) {
-        const expenseDiv = document.createElement('div');
-        expenseDiv.className = 'bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:shadow-md transition-shadow duration-150';
-
+    _getExpenseItemContentHTML(exp) {
         let contentHtml = `
             <div class="flex-grow w-full sm:w-auto">
                 <div class="flex justify-between items-start">
@@ -568,29 +565,40 @@ export class UIManager {
                     </p>
                 </div>
         `;
-
         if (exp.expense_description) {
             contentHtml += `<p class="text-xs text-gray-500 mt-2 italic">"${exp.expense_description}"</p>`;
         }
         contentHtml += `</div>`;
+        return contentHtml;
+    }
 
-        let buttonsHtml = '';
-        if (onEditCallback && onDeleteCallback) { // Only add buttons if callbacks are provided
-            buttonsHtml = `
-                <div class="flex gap-2 self-start sm:self-center mt-3 sm:mt-0">
-                    <button class="edit-expense-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Edit Expense">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
-                        </svg>
-                    </button>
-                    <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Delete Expense">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                            <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
-                        </svg>
-                    </button>
-                </div>
-            `;
+    _getExpenseItemButtonsHTML(exp, onEditCallback, onDeleteCallback) {
+        if (!onEditCallback || !onDeleteCallback) {
+            return ''; // No buttons if callbacks are not provided
         }
+        return `
+            <div class="flex gap-2 self-start sm:self-center mt-3 sm:mt-0">
+                <button class="edit-expense-btn bg-yellow-500 hover:bg-yellow-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Edit Expense">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.38-2.827-2.828z" />
+                    </svg>
+                </button>
+                <button class="delete-expense-btn bg-red-500 hover:bg-red-600 text-white p-2 rounded-full shadow-sm transform hover:scale-105 transition-transform duration-150 ease-in-out" data-id="${exp.id}" title="Delete Expense">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm6 0a1 1 0 01-2 0v6a1 1 0 112 0V8z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+        `;
+    }
+
+    _createExpenseListItem(exp, onEditCallback, onDeleteCallback) {
+        const expenseDiv = document.createElement('div');
+        expenseDiv.className = 'bg-white p-4 rounded-lg shadow-sm border border-gray-300 mb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 hover:shadow-md transition-shadow duration-150';
+
+        const contentHtml = this._getExpenseItemContentHTML(exp);
+        const buttonsHtml = this._getExpenseItemButtonsHTML(exp, onEditCallback, onDeleteCallback);
+
         expenseDiv.innerHTML = contentHtml + buttonsHtml;
         return expenseDiv;
     }
@@ -671,54 +679,59 @@ export class UIManager {
      * @param {boolean} isConnected - True if connected, false otherwise.
      * @param {string} connectionMessage - Message to display (e.g., "Connected" or error).
      */
+    _updateConnectionButton(isConnected) {
+        const button = this.elements.dbConnectToggle;
+        if (isConnected) {
+            button.textContent = 'Disconnect';
+            button.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-blue-600', 'hover:bg-blue-700', 'bg-gray-500', 'hover:bg-gray-600');
+            button.classList.add('bg-red-600', 'hover:bg-red-700');
+        } else {
+            button.textContent = 'Connect';
+            button.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
+            button.classList.add('bg-blue-600', 'hover:bg-blue-700');
+        }
+    }
+
+    _updateConnectionStatusMessage(isConnected, connectionMessage) {
+        const input = this.elements.dbConnectionString; // Used for parentNode reference
+        if (!this.elements.dbConnectionStatusMessage) {
+            this.elements.dbConnectionStatusMessage = document.createElement('p');
+            // Ensure className is set before checking parentNode, though it's minor here.
+            // The class will be correctly set by the isConnected logic below.
+            input.parentNode.insertBefore(this.elements.dbConnectionStatusMessage, input.nextSibling.nextSibling);
+        }
+        const statusMessageElement = this.elements.dbConnectionStatusMessage;
+        statusMessageElement.textContent = connectionMessage;
+        statusMessageElement.className = `text-sm mt-1 ${isConnected ? 'text-green-600' : 'text-red-600'}`;
+    }
+
+    _updateConnectionInput(isConnected) {
+        const input = this.elements.dbConnectionString;
+        input.disabled = isConnected;
+        if (!isConnected) {
+            input.value = ''; // Clear input only when becoming disconnected
+        }
+    }
+
     setConnectionStatus(isConnected, connectionMessage) {
         if (!this.elements.dbConnectToggle || !this.elements.dbConnectionString) {
             return;
         }
+        this._updateConnectionButton(isConnected);
+        this._updateConnectionStatusMessage(isConnected, connectionMessage);
+        this._updateConnectionInput(isConnected);
 
-        const button = this.elements.dbConnectToggle;
-        const input = this.elements.dbConnectionString;
-
-        // Create or get status message element
-        if (!this.elements.dbConnectionStatusMessage) {
-            this.elements.dbConnectionStatusMessage = document.createElement('p');
-            this.elements.dbConnectionStatusMessage.className = 'text-sm mt-1';
-            input.parentNode.insertBefore(this.elements.dbConnectionStatusMessage, input.nextSibling.nextSibling); // Insert after button
-        }
-        const statusMessageElement = this.elements.dbConnectionStatusMessage;
-
+        this._setMainUIEnabled(isConnected);
         if (isConnected) {
-            button.textContent = 'Disconnect';
-            button.classList.remove('bg-green-600', 'hover:bg-green-700', 'bg-blue-600', 'hover:bg-blue-700', 'bg-gray-500', 'hover:bg-gray-600');
-            button.classList.add('bg-red-600', 'hover:bg-red-700'); // Red for disconnect
-            statusMessageElement.textContent = connectionMessage;
-            statusMessageElement.className = 'text-sm mt-1 text-green-600';
-            input.disabled = true;
-            this._setMainUIEnabled(true);
-            this.activateTab('tab-expenses'); // Activate Expenses tab by default
-        } else {
-            button.textContent = 'Connect';
-            button.classList.remove('bg-red-600', 'hover:bg-red-700', 'bg-green-600', 'hover:bg-green-700');
-            // Use a neutral or initial color for connect
-            button.classList.add('bg-blue-600', 'hover:bg-blue-700');
-            statusMessageElement.textContent = connectionMessage;
-            statusMessageElement.className = 'text-sm mt-1 text-red-600'; // Red for error/disconnected message
-            input.disabled = false;
-            input.value = ''; // Clear the input field when disconnected
-            this._setMainUIEnabled(false);
+            this.activateTab('tab-expenses'); // Activate Expenses tab by default on connect
         }
     }
 
-    /**
-     * Enables or disables main UI elements.
-     * @private
-     * @param {boolean} enabled - True to enable, false to disable.
-     */
-    _setMainUIEnabled(enabled) {
-        // Disable/Enable tab buttons
+    _setTabButtonsEnabled(enabled) {
         this.elements.tabButtons.forEach(button => button.disabled = !enabled);
+    }
 
-        // Disable/Enable add forms (inputs and buttons)
+    _setFormElementsEnabled(enabled) {
         const formElements = [
             this.elements.groupNameInput, this.elements.addGroupBtn,
             this.elements.categoryNameInput, this.elements.addCategoryBtn,
@@ -729,28 +742,43 @@ export class UIManager {
             this.elements.expensePayerSelect, this.elements.expensePaymentModeSelect,
             this.elements.expenseDescription, this.elements.addExpenseBtn,
         ];
-
         formElements.forEach(el => {
             if (el) el.disabled = !enabled;
         });
+    }
 
-        // Optionally, add a visual cue for disabled sections (e.g., opacity)
+    _setTabContentsVisualState(enabled) {
         this.elements.tabContents.forEach(content => {
             content.style.opacity = enabled ? '1' : '0.5';
             content.style.pointerEvents = enabled ? 'auto' : 'none';
         });
+    }
 
-        // Clear lists if UI is disabled (optional, or show a message)
+    _updateListPlaceholders(enabled) {
         if (!enabled) {
             this.elements.groupsList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage groups.</p>';
             this.elements.categoriesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage categories.</p>';
             this.elements.payersList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage payers.</p>';
             this.elements.paymentModesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage payment modes.</p>';
             this.elements.expensesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage expenses.</p>';
-            // Also clear analytics or show a similar message
-             if (this.elements.analyticsResultsContainer) {
+            if (this.elements.analyticsResultsContainer) {
                 this.elements.analyticsResultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to view analytics.</p>';
             }
+        } else {
+            // Optionally, clear lists if they shouldn't retain old data when re-enabled before new data load
+            // For now, this is handled by render methods clearing their containers.
         }
+    }
+
+    /**
+     * Enables or disables main UI elements.
+     * @private
+     * @param {boolean} enabled - True to enable, false to disable.
+     */
+    _setMainUIEnabled(enabled) {
+        this._setTabButtonsEnabled(enabled);
+        this._setFormElementsEnabled(enabled);
+        this._setTabContentsVisualState(enabled);
+        this._updateListPlaceholders(enabled);
     }
 }

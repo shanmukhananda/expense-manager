@@ -119,51 +119,77 @@ class App {
         try {
             switch (tabId) {
                 case 'tab-groups':
-                    this.groups = await this.api.getGroups();
-                    this._renderGroups();
+                    await this._loadGroupsTabData();
                     break;
                 case 'tab-categories':
-                    this.categories = await this.api.getCategories();
-                    this._renderCategories();
+                    await this._loadCategoriesTabData();
                     break;
                 case 'tab-payers':
-                    this.payers = await this.api.getPayers();
-                    this._renderPayers();
+                    await this._loadPayersTabData();
                     break;
                 case 'tab-payment-modes':
-                    this.paymentModes = await this.api.getPaymentModes();
-                    this._renderPaymentModes();
+                    await this._loadPaymentModesTabData();
                     break;
                 case 'tab-expenses':
-                    await this.loadInitialData(); // Re-fetch all master data for dropdowns and expenses
-                    this._renderExpenses();
+                    await this._loadExpensesTabData();
                     break;
                 case 'tab-analytics':
-                    if (!this.categories || this.categories.length === 0 || !this.paymentModes || this.paymentModes.length === 0 || !this.groups || this.groups.length === 0 || !this.payers || this.payers.length === 0) {
-                        await this.loadInitialData();
-                    }
-                    // Guard against analytics rendering if data is still not available (e.g. loadInitialData failed silently)
-                    if (!this.dbConnected) return;
-                    this.analyticsManager.renderAnalyticsFilters({
-                        categories: this.categories,
-                        paymentModes: this.paymentModes,
-                        groups: this.groups,
-                        payers: this.payers
-                    }, this._handleApplyAnalyticsFilters.bind(this));
-                    // Set the callbacks for editing/deleting expenses shown in analytics
-                    this.analyticsManager.setExpenseActionCallbacks(
-                        this._handleEditExpense.bind(this),
-                        this._handleDeleteExpense.bind(this)
-                    );
-                    // Optionally, trigger an initial analytics data load or clear results
-                    // await this._handleApplyAnalyticsFilters(); // Load initial data
-                    this.analyticsManager.renderAnalyticsResults(null); // Or just clear previous results
+                    await this._loadAnalyticsTabData();
                     break;
             }
         } catch (error) {
             console.error(`Error loading tab ${tabId}:`, error);
             this.ui.showInfoModal('Load Error', `Failed to load ${tabId.replace('tab-', '')} data: ${error.message}`);
         }
+    }
+
+    async _loadGroupsTabData() {
+        this.groups = await this.api.getGroups();
+        this._renderGroups();
+    }
+
+    async _loadCategoriesTabData() {
+        this.categories = await this.api.getCategories();
+        this._renderCategories();
+    }
+
+    async _loadPayersTabData() {
+        this.payers = await this.api.getPayers();
+        this._renderPayers();
+    }
+
+    async _loadPaymentModesTabData() {
+        this.paymentModes = await this.api.getPaymentModes();
+        this._renderPaymentModes();
+    }
+
+    async _loadExpensesTabData() {
+        await this.loadInitialData(); // Re-fetch all master data for dropdowns and expenses
+        this._renderExpenses();
+    }
+
+    async _loadAnalyticsTabData() {
+        if (!this.categories || this.categories.length === 0 ||
+            !this.paymentModes || this.paymentModes.length === 0 ||
+            !this.groups || this.groups.length === 0 ||
+            !this.payers || this.payers.length === 0) {
+            await this.loadInitialData();
+        }
+        // Guard against analytics rendering if data is still not available or DB disconnected
+        if (!this.dbConnected) return;
+
+        this.analyticsManager.renderAnalyticsFilters({
+            categories: this.categories,
+            paymentModes: this.paymentModes,
+            groups: this.groups,
+            payers: this.payers
+        }, this._handleApplyAnalyticsFilters.bind(this));
+
+        this.analyticsManager.setExpenseActionCallbacks(
+            this._handleEditExpense.bind(this),
+            this._handleDeleteExpense.bind(this)
+        );
+        this.analyticsManager.renderAnalyticsResults(null); // Clear previous results
     }
 
     async _handleApplyAnalyticsFilters() {
@@ -178,81 +204,87 @@ class App {
     }
 
     // --- Database Connection Management ---
+    async _attemptDbDisconnect() {
+        try {
+            await this.api.disconnectDB();
+            this.dbConnected = false;
+            this.ui.setConnectionStatus(false, 'Disconnected from database.');
+            this.groups = [];
+            this.categories = [];
+            this.payers = [];
+            this.paymentModes = [];
+            this.expenses = [];
+            // UIManager._setMainUIEnabled(false) called by setConnectionStatus handles UI clearing.
+        } catch (error) {
+            console.error('Failed to disconnect from database:', error);
+            this.ui.showInfoModal('Error', `Failed to disconnect from database: ${error.message}`);
+            // UI remains in connected state if disconnect failed, dbConnected remains true.
+        }
+    }
+
+    async _attemptDbConnect() {
+        const connectionString = this.ui.getDatabasePath();
+        if (!connectionString) {
+            this.ui.showInfoModal('Input Required', 'Please enter a database connection string.');
+            return;
+        }
+        try {
+            await this.api.connectDB(connectionString);
+            this.dbConnected = true;
+            this.ui.setConnectionStatus(true, 'Successfully connected to database.');
+            await this.loadInitialData();
+            // Activate a default tab
+            if (this.expenses && this.expenses.length > 0) {
+                this._handleTabChange('tab-expenses');
+            } else {
+                this._handleTabChange('tab-groups');
+            }
+        } catch (error) {
+            console.error('Failed to connect to database:', error);
+            this.dbConnected = false;
+            this.ui.setConnectionStatus(false, `Failed to connect. ${error.message}`);
+            this.ui.showInfoModal('Connection Error', `Failed to connect. Details: ${error.message}`);
+        }
+    }
+
     async handleConnectToggle() {
         if (this.dbConnected) {
-            // Attempt to disconnect
-            try {
-                await this.api.disconnectDB();
-                this.dbConnected = false;
-                this.ui.setConnectionStatus(false, 'Disconnected from database.');
-                // Clearing UI lists is handled by UIManager._setMainUIEnabled(false)
-                // which is called by setConnectionStatus.
-                // Reset data arrays
-                this.groups = [];
-                this.categories = [];
-                this.payers = [];
-                this.paymentModes = [];
-                this.expenses = [];
-                // Optionally, switch to a default non-data tab or clear active tab state
-                // this.ui.activateTab('some-default-tab-id'); // If you have one
-            } catch (error) {
-                console.error('Failed to disconnect from database:', error);
-                this.ui.showInfoModal('Error', `Failed to disconnect from database: ${error.message}`);
-                // UI remains in connected state as disconnect failed.
-            }
+            await this._attemptDbDisconnect();
         } else {
-            // Attempt to connect
-            const connectionString = this.ui.getDatabasePath();
-            if (!connectionString) {
-                this.ui.showInfoModal('Input Required', 'Please enter a database connection string.');
-                return;
-            }
-            try {
-                await this.api.connectDB(connectionString);
-                this.dbConnected = true;
-                this.ui.setConnectionStatus(true, 'Successfully connected to database.');
-                await this.loadInitialData(); // Fetch and display data
-                // Activate a default tab if none is active or to refresh view
-                if (this.expenses.length > 0) { // Prioritize expenses tab if data exists
-                    this._handleTabChange('tab-expenses');
-                } else {
-                    this._handleTabChange('tab-groups'); // Default to groups tab
-                }
-            } catch (error) {
-                console.error('Failed to connect to database:', error);
-                this.dbConnected = false; // Ensure state is updated
-                this.ui.setConnectionStatus(false, `Failed to connect. ${error.message}`);
-                this.ui.showInfoModal('Connection Error', `Failed to connect to the database. Please check the connection string and ensure the database server is running. Details: ${error.message}`);
-            }
+            await this._attemptDbConnect();
         }
+    }
+
+    async _handleInitialConnectedState(statusMessage) {
+        this.dbConnected = true;
+        this.ui.setConnectionStatus(true, statusMessage || 'Connected to database.');
+        await this.loadInitialData();
+        // Activate a default tab
+        if (this.expenses && this.expenses.length > 0) {
+            this._handleTabChange('tab-expenses');
+        } else if (this.groups && this.groups.length > 0) {
+            this._handleTabChange('tab-groups');
+        } else {
+            this.ui.activateTab('tab-groups'); // Default if no data in preferred tabs
+        }
+    }
+
+    _handleInitialDisconnectedState(statusMessage) {
+        this.dbConnected = false;
+        this.ui.setConnectionStatus(false, statusMessage || 'Enter database URI and click Connect.');
     }
 
     async checkInitialDbStatus() {
         try {
-            const status = await this.api.getDBStatus(); // Assumes API returns { connected: true/false, message?: string }
+            const status = await this.api.getDBStatus();
             if (status && status.connected) {
-                this.dbConnected = true;
-                this.ui.setConnectionStatus(true, status.message || 'Connected to database.');
-                await this.loadInitialData();
-                // Activate a default tab, e.g., groups or expenses if they have content
-                if (this.expenses && this.expenses.length > 0) {
-                     this._handleTabChange('tab-expenses');
-                } else if (this.groups && this.groups.length > 0) {
-                    this._handleTabChange('tab-groups');
-                } else {
-                    // If no data, pick a default sensible tab.
-                    this.ui.activateTab('tab-groups'); // Or some other default tab
-                }
+                await this._handleInitialConnectedState(status.message);
             } else {
-                this.dbConnected = false;
-                // Message is already set by constructor, but can be reinforced by status.message if provided
-                this.ui.setConnectionStatus(false, status.message || 'Enter database URI and click Connect.');
+                this._handleInitialDisconnectedState(status ? status.message : undefined);
             }
         } catch (error) {
             console.error('Failed to get initial DB status:', error);
-            this.dbConnected = false;
-            this.ui.setConnectionStatus(false, `Failed to check DB status: ${error.message}. Enter URI and connect.`);
-            // No need to showInfoModal here as the default message is already shown
+            this._handleInitialDisconnectedState(`Failed to check DB status: ${error.message}. Enter URI and connect.`);
         }
     }
 
@@ -372,47 +404,55 @@ class App {
     }
 
     // --- Specific Edit Expense Handler ---
+    async _ensureMasterDataForEditing() {
+        if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
+            console.log('_ensureMasterDataForEditing: Master data missing, attempting to load.');
+            await this.loadInitialData();
+            if (!this.dbConnected) return false; // Load failed or disconnected during load
+            if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
+                this.ui.showInfoModal('Data Missing', 'Could not load necessary master data for editing. Please try again.');
+                return false;
+            }
+        }
+        return true;
+    }
+
+    async _refreshDataAfterChange() {
+        if (this.activeTabId === 'tab-analytics') {
+            await this._handleApplyAnalyticsFilters();
+        } else {
+            await this.loadInitialData(); // Reloads expenses and master data
+            this._renderExpenses();      // Re-renders the main expense list
+        }
+    }
+
+    async _processExpenseUpdate(updatedExpenseData) {
+        try {
+            const updatedExpense = await this.api.updateExpense(updatedExpenseData.id, updatedExpenseData);
+            if (updatedExpense) {
+                this.ui.showInfoModal('Success', 'Expense updated successfully.');
+                await this._refreshDataAfterChange();
+            }
+        } catch (error) {
+            this.ui.showInfoModal('Edit Error', `Failed to update expense: ${error.message}`);
+        }
+    }
+
     async _handleEditExpense(expenseToEdit) {
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', 'Please connect to the database to edit an expense.');
             return;
         }
-        // Ensure master data for dropdowns is available
-        if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
-            console.log('_handleEditExpense: Master data missing, attempting to load.');
-            await this.loadInitialData();
-            if (!this.dbConnected) return;
-            if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
-                 this.ui.showInfoModal('Data Missing', 'Could not load necessary master data for editing. Please try again.');
-                 return;
-            }
-        }
+
+        const masterDataAvailable = await this._ensureMasterDataForEditing();
+        if (!masterDataAvailable) return;
 
         this.ui.showEditExpenseModal(expenseToEdit, {
             groups: this.groups,
             categories: this.categories,
             payers: this.payers,
             paymentModes: this.paymentModes
-        }, async (updatedExpenseData) => {
-            try {
-                const updatedExpense = await this.api.updateExpense(updatedExpenseData.id, updatedExpenseData);
-                if (updatedExpense) {
-                    this.ui.showInfoModal('Success', 'Expense updated successfully.');
-                    // Refresh data based on the current tab
-                    if (this.activeTabId === 'tab-analytics') {
-                        await this._handleApplyAnalyticsFilters();
-                    } else {
-                        // For expenses tab or any other, reload expenses and re-render that tab
-                        await this.loadInitialData(); // Reloads all master data and expenses
-                        this._renderExpenses(); // Re-renders the main expense list
-                    }
-                    // Ensure dropdowns in forms are also up-to-date if master data could have changed (though not typical for expense edit)
-                    // await this._loadAndDisplayMasterData(); // Potentially redundant if loadInitialData called
-                }
-            } catch (error) {
-                this.ui.showInfoModal('Edit Error', `Failed to update expense: ${error.message}`);
-            }
-        });
+        }, this._processExpenseUpdate.bind(this));
     }
 
     // --- Specific Delete Handlers (delegating to generic for master data) ---
@@ -441,16 +481,7 @@ class App {
         try {
             await this.api.deleteExpense(id);
             this.ui.showInfoModal('Success', 'Expense deleted successfully.');
-            // Refresh data based on the current tab
-            if (this.activeTabId === 'tab-analytics') {
-                await this._handleApplyAnalyticsFilters();
-            } else {
-                // For expenses tab or any other, reload expenses and re-render that tab
-                await this.loadInitialData(); // Reloads all master data and expenses
-                this._renderExpenses(); // Re-renders the main expense list
-            }
-            // Ensure dropdowns in forms are also up-to-date if master data could have changed
-            // await this._loadAndDisplayMasterData(); // Potentially redundant if loadInitialData called
+            await this._refreshDataAfterChange();
         } catch (error) {
             this.ui.showInfoModal('Delete Error', `Failed to delete expense: ${error.message}`);
         }
