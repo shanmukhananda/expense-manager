@@ -150,11 +150,17 @@ class ExpenseManagerServerController {
             const newEntity = await repository.add(name);
             res.status(201).json(newEntity);
         } catch (err) {
-        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) { // Fallback for safety
-            res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` }); // Consider singularizing tableName more robustly
-            } else {
-                res.status(500).json({ error: err.message });
-            }
+            this._handleEntityAddError(err, repository, res);
+        }
+    }
+
+    _handleEntityAddError(err, repository, res) {
+        if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) {
+            const entityName = repository.tableName.endsWith('s') ? repository.tableName.slice(0, -1) : repository.tableName;
+            res.status(409).json({ error: `${entityName} with this name already exists.` });
+        } else {
+            console.error(`Error adding to ${repository.tableName}:`, err.message);
+            res.status(500).json({ error: err.message });
         }
     }
 
@@ -174,13 +180,19 @@ class ExpenseManagerServerController {
             const updatedEntity = await repository.update(id, name);
             res.json(updatedEntity);
         } catch (err) {
-        if (err.message && err.message.includes('not found or no changes made')) { // Custom error from repository
-                res.status(404).json({ error: err.message });
+            this._handleEntityUpdateError(err, repository, res);
+        }
+    }
+
+    _handleEntityUpdateError(err, repository, res) {
+        if (err.message && err.message.includes('not found or no changes made')) {
+            res.status(404).json({ error: err.message });
         } else if (err.code === 'SQLITE_CONSTRAINT_UNIQUE' || (err.message && err.message.includes('UNIQUE constraint failed'))) {
-            res.status(409).json({ error: `${repository.tableName.slice(0, -1)} with this name already exists.` }); // Consider singularizing tableName
-            } else {
-                res.status(500).json({ error: err.message });
-            }
+            const entityName = repository.tableName.endsWith('s') ? repository.tableName.slice(0, -1) : repository.tableName;
+            res.status(409).json({ error: `${entityName} with this name already exists.` });
+        } else {
+            console.error(`Error updating ${repository.tableName}:`, err.message);
+            res.status(500).json({ error: err.message });
         }
     }
 
@@ -196,13 +208,22 @@ class ExpenseManagerServerController {
             await repository.delete(id);
             res.status(204).send(); // No content for successful deletion
         } catch (err) {
-            if (err.message && err.message.includes('not found')) { // Custom error from repository
-                res.status(404).json({ error: err.message });
-            } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed')) || (err.message && err.message.includes('associated with existing expenses'))) { // More robust check
-                res.status(400).json({ error: err.message });
-            } else {
-                res.status(500).json({ error: err.message });
-            }
+            this._handleEntityDeleteError(err, repository, res);
+        }
+    }
+
+    _handleEntityDeleteError(err, repository, res) {
+        if (err.message && err.message.includes('not found')) {
+            res.status(404).json({ error: err.message });
+        } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' ||
+                   (err.message && err.message.includes('FOREIGN KEY constraint failed')) ||
+                   (err.message && err.message.includes('associated with existing expenses'))) {
+            // Provide a more user-friendly message for foreign key constraints
+            const entityName = repository.tableName.endsWith('s') ? repository.tableName.slice(0, -1) : repository.tableName;
+            res.status(400).json({ error: `Cannot delete this ${entityName} as it is associated with existing expenses or other records. Original: ${err.message}` });
+        } else {
+            console.error(`Error deleting from ${repository.tableName}:`, err.message);
+            res.status(500).json({ error: err.message });
         }
     }
 
@@ -233,11 +254,16 @@ class ExpenseManagerServerController {
             const newExpense = await this.expenseRepository.addExpense(expenseData);
             res.status(201).json(newExpense);
         } catch (err) {
-            if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed'))) {
-                res.status(400).json({ error: 'Invalid ID provided for group, category, payer, or payment mode.' });
-            } else {
-                res.status(500).json({ error: err.message });
-            }
+            this._handleExpenseForeignKeyError(err, res, 'add');
+        }
+    }
+
+    _handleExpenseForeignKeyError(err, res, operationType = 'process') {
+        if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed'))) {
+            res.status(400).json({ error: `Invalid ID provided for group, category, payer, or payment mode during ${operationType}.` });
+        } else {
+            console.error(`Error during expense ${operationType}:`, err.message);
+            res.status(500).json({ error: err.message });
         }
     }
 
@@ -254,12 +280,11 @@ class ExpenseManagerServerController {
             const updatedExpense = await this.expenseRepository.updateExpense(id, expenseData);
             res.json(updatedExpense);
         } catch (err) {
-            if (err.message && err.message.includes('not found or no changes made')) { // Custom error from repository
+            if (err.message && err.message.includes('not found or no changes made')) {
                 res.status(404).json({ error: err.message });
-            } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' || (err.message && err.message.includes('FOREIGN KEY constraint failed'))) {
-                res.status(400).json({ error: 'Invalid ID provided for group, category, payer, or payment mode during update.' });
             } else {
-                res.status(500).json({ error: err.message });
+                // Reuse the helper for foreign key and other generic errors
+                this._handleExpenseForeignKeyError(err, res, 'update');
             }
         }
     }

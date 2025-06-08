@@ -96,13 +96,7 @@ class ExpenseRepository {
         }
     }
 
-    async getAnalyticsData(filters = {}) {
-        let overallTotal = 0;
-        let totalFilteredCount = 0;
-        const categoryBreakdown = [];
-        const categoryTotals = {};
-        // categoryNames map is no longer needed as category_name is directly available in rows.
-
+    _buildAnalyticsQuery(filters = {}) {
         let sql = `
             SELECT
                 e.id,
@@ -128,7 +122,18 @@ class ExpenseRepository {
         const whereClauses = [];
         let paramIndex = 1;
 
-        // Date filters
+        // Helper function to process and add ID-based filters
+        const addIdFilter = (filterValue, columnName) => {
+            let ids = filterValue;
+            if (typeof ids === 'string') {
+                ids = ids.trim() === '' ? [] : ids.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
+            }
+            if (Array.isArray(ids) && ids.length > 0) {
+                whereClauses.push(`${columnName} IN (${ids.map(() => `$${paramIndex++}`).join(',')})`);
+                params.push(...ids);
+            }
+        };
+
         if (filters.startDate && filters.endDate) {
             whereClauses.push(`e.date BETWEEN $${paramIndex++} AND $${paramIndex++}`);
             params.push(filters.startDate, filters.endDate);
@@ -140,82 +145,45 @@ class ExpenseRepository {
             params.push(filters.endDate);
         }
 
-        // Category ID filters
-        let categoryIds = filters.categoryIds;
-        if (categoryIds) {
-            if (typeof categoryIds === 'string') {
-                categoryIds = categoryIds.trim() === '' ? [] : categoryIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
-            }
-            if (Array.isArray(categoryIds) && categoryIds.length > 0) {
-                whereClauses.push(`e.expense_category_id IN (${categoryIds.map(() => `$${paramIndex++}`).join(',')})`);
-                params.push(...categoryIds);
-            }
-        }
-        
-        // Payment Mode ID filters
-        let paymentModeIds = filters.paymentModeIds;
-        if (paymentModeIds) {
-            if (typeof paymentModeIds === 'string') {
-                paymentModeIds = paymentModeIds.trim() === '' ? [] : paymentModeIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
-            }
-            if (Array.isArray(paymentModeIds) && paymentModeIds.length > 0) {
-                whereClauses.push(`e.payment_mode_id IN (${paymentModeIds.map(() => `$${paramIndex++}`).join(',')})`);
-                params.push(...paymentModeIds);
-            }
-        }
-
-        // Group ID filters
-        let groupIds = filters.groupIds;
-        if (groupIds) {
-            if (typeof groupIds === 'string') {
-                groupIds = groupIds.trim() === '' ? [] : groupIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
-            }
-            if (Array.isArray(groupIds) && groupIds.length > 0) {
-                whereClauses.push(`e.expense_group_id IN (${groupIds.map(() => `$${paramIndex++}`).join(',')})`);
-                params.push(...groupIds);
-            }
-        }
-
-        // Payer ID filters
-        let payerIds = filters.payerIds;
-        if (payerIds) {
-            if (typeof payerIds === 'string') {
-                payerIds = payerIds.trim() === '' ? [] : payerIds.split(',').map(id => parseInt(id.trim())).filter(id => !isNaN(id) && id !== null);
-            }
-            if (Array.isArray(payerIds) && payerIds.length > 0) {
-                whereClauses.push(`e.payer_id IN (${payerIds.map(() => `$${paramIndex++}`).join(',')})`);
-                params.push(...payerIds);
-            }
-        }
+        addIdFilter(filters.categoryIds, 'e.expense_category_id');
+        addIdFilter(filters.paymentModeIds, 'e.payment_mode_id');
+        addIdFilter(filters.groupIds, 'e.expense_group_id');
+        addIdFilter(filters.payerIds, 'e.payer_id');
 
         if (whereClauses.length > 0) {
             sql += ' WHERE ' + whereClauses.join(' AND ');
         }
-        // Add ORDER BY to make the list of expenses consistent
         sql += ` ORDER BY e.date DESC`;
+        return { sql, params };
+    }
 
-        const rows = await this.dbManager.runQuery(sql, params);
-        const filteredExpenses = rows; // These are the detailed expenses
+    _aggregateAnalyticsData(rows) {
+        let overallTotal = 0;
+        const categoryTotals = {};
+        const categoryBreakdown = [];
 
-        if (rows && rows.length > 0) {
-            totalFilteredCount = rows.length;
-            rows.forEach(row => {
-                overallTotal += row.amount;
-                // For category breakdown, use expense_category_id and category_name from the row
-                const categoryId = row.expense_category_id;
-                categoryTotals[categoryId] = (categoryTotals[categoryId] || 0) + row.amount;
-                // categoryNames map is no longer needed
-            });
+        if (!rows || rows.length === 0) {
+            return {
+                overallTotal: 0,
+                totalFilteredCount: 0,
+                categoryBreakdown: []
+            };
         }
+
+        const totalFilteredCount = rows.length;
+        rows.forEach(row => {
+            overallTotal += row.amount;
+            const categoryId = row.expense_category_id;
+            categoryTotals[categoryId] = (categoryTotals[categoryId] || 0) + row.amount;
+        });
 
         for (const categoryId in categoryTotals) {
             const totalAmount = categoryTotals[categoryId];
             const percentage = overallTotal === 0 ? 0 : (totalAmount / overallTotal) * 100;
-            // Find a representative row for the category name
-            const representativeRow = rows.find(r => r.expense_category_id == categoryId);
+            const representativeRow = rows.find(r => r.expense_category_id == categoryId); // Safe due to rows.length check
             categoryBreakdown.push({
                 categoryId: parseInt(categoryId),
-                categoryName: representativeRow ? representativeRow.category_name : 'Unknown Category', // Fallback
+                categoryName: representativeRow ? representativeRow.category_name : 'Unknown Category',
                 totalAmount: parseFloat(totalAmount.toFixed(2)),
                 percentage: parseFloat(percentage.toFixed(2))
             });
@@ -226,8 +194,19 @@ class ExpenseRepository {
         return {
             overallTotal: parseFloat(overallTotal.toFixed(2)),
             totalFilteredCount,
-            categoryBreakdown,
-            filteredExpenses // Add the new field
+            categoryBreakdown
+        };
+    }
+
+    async getAnalyticsData(filters = {}) {
+        const { sql, params } = this._buildAnalyticsQuery(filters);
+        const rows = await this.dbManager.runQuery(sql, params);
+
+        const aggregatedData = this._aggregateAnalyticsData(rows);
+
+        return {
+            ...aggregatedData,
+            filteredExpenses: rows // The raw rows are the filtered expenses
         };
     }
 }
