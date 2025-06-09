@@ -49,6 +49,7 @@
             <button id="tab-payers" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-colors duration-200 ease-in-out focus:ring-offset-2">Payers</button>
             <button id="tab-payment-modes" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-colors duration-200 ease-in-out focus:ring-offset-2">Payment Modes</button>
             <button id="tab-analytics" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-colors duration-200 ease-in-out focus:ring-offset-2">Analytics</button>
+            <button id="tab-import-export" class="tab-button bg-gray-200 hover:bg-gray-300 text-gray-800 font-semibold py-2 px-4 sm:px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-opacity-75 transition-colors duration-200 ease-in-out focus:ring-offset-2">Import/Export</button>
         </div>
 
         <div id="content-groups" class="tab-content hidden">
@@ -153,6 +154,30 @@
                 <h3 class="text-xl font-semibold text-gray-700 mb-4">Results</h3>
                 <!-- Analytics results will be displayed here -->
                 <p class="text-gray-500">Analytics results will be displayed here.</p>
+            </div>
+        </div>
+
+        <div id="content-import-export" class="tab-content hidden">
+            <h2 class="text-2xl font-semibold text-gray-700 mb-6">Import/Export Data</h2>
+
+            <div class="bg-gray-50 p-6 sm:p-8 rounded-lg border border-gray-300 mb-8 shadow-md">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Import from CSV</h3>
+                <p class="text-sm text-gray-600 mb-1">Select a CSV file to import expenses.</p>
+                <p class="text-xs text-gray-500 mb-4">Expected format: Date (DD-Mon-YYYY), Amount, Expense Category, Expense Group, Payer, Payment mode, Expense Description (optional)</p>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3 mb-4">
+                    <input type="file" id="csv-import-file" accept=".csv" class="w-full sm:flex-grow p-3 border border-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
+                    <button id="import-csv-btn" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 transform hover:scale-105 transition-transform duration-150 ease-in-out">Import CSV</button>
+                </div>
+            </div>
+
+            <div class="bg-gray-50 p-6 sm:p-8 rounded-lg border border-gray-300 mb-8 shadow-md">
+                <h3 class="text-xl font-semibold text-gray-700 mb-4">Export to CSV</h3>
+                <p class="text-sm text-gray-600 mb-4">Export all expenses to a CSV file.</p>
+                <button id="export-csv-btn" class="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg shadow-md focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-75 transform hover:scale-105 transition-transform duration-150 ease-in-out">Export All as CSV</button>
+            </div>
+
+            <div id="import-export-status" class="mt-6 p-4 rounded-lg bg-gray-100 border border-gray-300 text-sm text-gray-700 min-h-[50px]">
+                Status messages will appear here...
             </div>
         </div>
     </div>
