@@ -230,7 +230,7 @@ class CsvService {
             if (!expensesData || expensesData.length === 0) {
                 console.log("CsvService: No expenses found to export.");
                 // Return CSV header even if no data
-                return stringify([], { header: true, columns: ['Date', 'Amount', 'Expense Group', 'Expense Category', 'Payer', 'Payment mode', 'Expense Description'] });
+                return stringify([], { header: true, columns: ['Date', 'Amount', 'Expense Category', 'Expense Description', 'Expense Group', 'Payer', 'Payment mode'] });
             }
 
             // Format date to DD-Mon-YYYY for export consistency with expected import format (if any)
@@ -251,11 +251,11 @@ class CsvService {
                 columns: [ // Define column order and headers explicitly
                     { key: 'date', header: 'Date' },
                     { key: 'amount', header: 'Amount' },
-                    { key: 'Expense Group', header: 'Expense Group' },
                     { key: 'Expense Category', header: 'Expense Category' },
+                    { key: 'Expense Description', header: 'Expense Description' },
+                    { key: 'Expense Group', header: 'Expense Group' },
                     { key: 'Payer', header: 'Payer' },
-                    { key: 'Payment mode', header: 'Payment mode' },
-                    { key: 'Expense Description', header: 'Expense Description' }
+                    { key: 'Payment mode', header: 'Payment mode' }
                 ]
             });
             console.log("CsvService: CSV export process completed successfully.");
