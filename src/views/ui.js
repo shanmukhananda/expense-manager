@@ -77,6 +77,11 @@ export class UIManager {
             editExpenseSaveBtn: document.getElementById('edit-expense-save-btn'),
             editExpenseCancelBtn: document.getElementById('edit-expense-cancel-btn'),
 
+            // Import/Export Tab Elements
+            csvImportFile: document.getElementById('csv-import-file'),
+            importCsvBtn: document.getElementById('import-csv-btn'),
+            exportCsvBtn: document.getElementById('export-csv-btn'),
+            importExportStatus: document.getElementById('import-export-status'),
             // Analytics Tab Elements
             contentAnalytics: document.getElementById('content-analytics'),
             analyticsFiltersContainer: document.getElementById('analytics-filters-container'),
@@ -110,6 +115,22 @@ export class UIManager {
                 if (this.onConnectToggle) {
                     this.onConnectToggle();
                 }
+            });
+        }
+
+        if (this.elements.importCsvBtn) {
+            this.elements.importCsvBtn.addEventListener('click', async () => {
+                if (this.elements.csvImportFile && this.elements.csvImportFile.files.length > 0) {
+                    if (this.onImportCsv) await this.onImportCsv();
+                } else {
+                    this.displayImportExportStatus('Please select a CSV file first.', true);
+                }
+            });
+        }
+
+        if (this.elements.exportCsvBtn) {
+            this.elements.exportCsvBtn.addEventListener('click', async () => {
+                if (this.onExportCsv) await this.onExportCsv();
             });
         }
     }
@@ -254,6 +275,12 @@ export class UIManager {
      */
     onConnectToggle = async () => {};
 
+    /** @type {function(): Promise<void>} */
+    onImportCsv = async () => {};
+
+    /** @type {function(): Promise<void>} */
+    onExportCsv = async () => {};
+
     /**
      * Attaches add button listeners. This is called by the App class
      * after setting up the callbacks.
@@ -396,6 +423,48 @@ export class UIManager {
     /** Hides the info modal. */
     hideInfoModal() {
         this.elements.infoModal.classList.add('hidden');
+    }
+
+    /**
+     * Displays a message in the import/export status area.
+     * @param {string} message - The message to display.
+     * @param {boolean} [isError=false] - True if the message is an error (styled red).
+     * @param {boolean} [isSuccess=false] - True if the message is a success (styled green).
+     */
+    displayImportExportStatus(message, isError = false, isSuccess = false) {
+        if (this.elements.importExportStatus) {
+            this.elements.importExportStatus.textContent = message;
+            this.elements.importExportStatus.classList.remove('text-red-600', 'text-green-600', 'text-gray-700');
+            if (isError) {
+                this.elements.importExportStatus.classList.add('text-red-600');
+            } else if (isSuccess) {
+                this.elements.importExportStatus.classList.add('text-green-600');
+            } else {
+                this.elements.importExportStatus.classList.add('text-gray-700');
+            }
+        }
+    }
+
+    /**
+     * Triggers a browser download for the given CSV string.
+     * @param {string} csvString - The CSV data as a string.
+     * @param {string} filename - The desired filename for the download.
+     */
+    triggerCsvDownload(csvString, filename) {
+        const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        if (link.download !== undefined) { // Feature detection
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', filename);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        } else {
+            this.displayImportExportStatus('CSV download failed: Browser does not support this feature.', true);
+        }
     }
 
     /**
@@ -675,6 +744,17 @@ export class UIManager {
     }
 
     /**
+     * Gets the selected file object for import.
+     * @returns {File|null} The file object or null if not selected.
+     */
+    getImportFile() {
+        if (this.elements.csvImportFile && this.elements.csvImportFile.files.length > 0) {
+            return this.elements.csvImportFile.files[0];
+        }
+        return null;
+    }
+
+    /**
      * Sets the visual status of the database connection.
      * @param {boolean} isConnected - True if connected, false otherwise.
      * @param {string} connectionMessage - Message to display (e.g., "Connected" or error).
@@ -741,6 +821,8 @@ export class UIManager {
             this.elements.expenseGroupSelect, this.elements.expenseCategorySelect,
             this.elements.expensePayerSelect, this.elements.expensePaymentModeSelect,
             this.elements.expenseDescription, this.elements.addExpenseBtn,
+            this.elements.csvImportFile, this.elements.importCsvBtn,
+            this.elements.exportCsvBtn,
         ];
         formElements.forEach(el => {
             if (el) el.disabled = !enabled;
@@ -763,6 +845,11 @@ export class UIManager {
             this.elements.expensesList.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to manage expenses.</p>';
             if (this.elements.analyticsResultsContainer) {
                 this.elements.analyticsResultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Connect to database to view analytics.</p>';
+            }
+            if (this.elements.importExportStatus) {
+                this.elements.importExportStatus.textContent = 'Connect to database to use Import/Export features.';
+                this.elements.importExportStatus.classList.remove('text-red-600', 'text-green-600');
+                this.elements.importExportStatus.classList.add('text-gray-700');
             }
         } else {
             // Optionally, clear lists if they shouldn't retain old data when re-enabled before new data load

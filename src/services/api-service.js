@@ -234,4 +234,48 @@ export class ApiService {
         const queryString = queryParams.toString();
         return this.get(`/expenses/analytics${queryString ? '?' + queryString : ''}`);
     }
+
+    /**
+     * Imports CSV data via the backend API.
+     * @param {string} fileContentsString - The CSV data as a string.
+     * @returns {Promise<Object>} Promise resolving to the server's JSON response
+     *                            (e.g., { successfulInserts, failedInserts, totalRows, errors }).
+     */
+    async importCsv(fileContentsString) {
+        // The generic this.post method should work fine as it expects JSON response.
+        return this.post('/csv/import', { csvData: fileContentsString });
+    }
+
+    /**
+     * Exports CSV data from the backend API.
+     * @returns {Promise<string>} Promise resolving to the CSV data as a string.
+     * @throws {Error} If the network request fails or the server returns an error.
+     */
+    async exportCsv() {
+        try {
+            const response = await fetch(`${this.baseUrl}/csv/export`); // GET request by default
+            if (!response.ok) {
+                // Try to parse error as JSON, but fallback if not
+                let errorMessage = `HTTP error! Status: ${response.status}`;
+                try {
+                    const errorData = await response.json();
+                    errorMessage = errorData.error || errorMessage;
+                } catch (e) {
+                    // If error response is not JSON, use the text
+                    try {
+                         const errorText = await response.text();
+                         errorMessage = errorText || errorMessage;
+                    } catch (e_text) {
+                        // Keep original error message
+                    }
+                }
+                throw new Error(errorMessage);
+            }
+            // Expect text/csv response
+            return await response.text();
+        } catch (error) {
+            console.error('Error exporting CSV data:', error);
+            throw error; // Re-throw to be handled by the caller
+        }
+    }
 }

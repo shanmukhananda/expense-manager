@@ -48,6 +48,9 @@ class App {
         this.ui.onAddPaymentMode = this._handleAddPaymentMode.bind(this);
         this.ui.onAddExpense = this._handleAddExpense.bind(this);
         this.ui.onEditExpense = this._handleEditExpense.bind(this);
+
+        this.ui.onImportCsv = this._handleImportCsv.bind(this);
+        this.ui.onExportCsv = this._handleExportCsv.bind(this);
     }
 
     /**
@@ -135,6 +138,9 @@ class App {
                     break;
                 case 'tab-analytics':
                     await this._loadAnalyticsTabData();
+                    break;
+                case 'tab-import-export':
+                    this.ui.displayImportExportStatus('Ready for CSV import or export. Ensure database is connected.');
                     break;
             }
         } catch (error) {
@@ -486,7 +492,67 @@ class App {
             this.ui.showInfoModal('Delete Error', `Failed to delete expense: ${error.message}`);
         }
     }
-}
+
+    async _handleImportCsv() {
+        if (!this.dbConnected) {
+            this.ui.displayImportExportStatus('Please connect to the database first to import CSV.', true);
+            if (this.ui.elements.csvImportFile) this.ui.elements.csvImportFile.value = '';
+            return;
+        }
+
+        const file = this.ui.getImportFile();
+        if (!file) {
+            this.ui.displayImportExportStatus('No file selected. Please choose a CSV file.', true);
+            return;
+        }
+
+        this.ui.displayImportExportStatus('Importing, please wait...');
+        try {
+            const fileContentsString = await file.text();
+            // Assuming this.api.importCsv will be added to ApiService
+            const result = await this.api.importCsv(fileContentsString);
+
+            let message = `Import complete. Total rows processed by server: ${result.totalRows || 'N/A'}. Successful: ${result.successfulInserts || 0}. Failed: ${result.failedInserts || 0}.`;
+            if (result.failedInserts > 0 || (result.errors && result.errors.length > 0)) {
+                 message += " Some rows may have failed. Check server console for details if errors array is not detailed enough.";
+                 this.ui.displayImportExportStatus(message, true, (result.successfulInserts || 0) > 0);
+            } else {
+                this.ui.displayImportExportStatus(message, false, true);
+            }
+
+            if (result.successfulInserts > 0) {
+                await this._refreshDataAfterChange(); // Refresh data as import was successful
+            }
+        } catch (error) {
+            console.error('Error during CSV import API call:', error);
+            this.ui.displayImportExportStatus(`Import API request failed: ${error.message}`, true);
+        } finally {
+            if (this.ui.elements.csvImportFile) this.ui.elements.csvImportFile.value = '';
+        }
+    }
+
+    async _handleExportCsv() {
+        if (!this.dbConnected) {
+            this.ui.displayImportExportStatus('Please connect to the database first to export CSV.', true);
+            return;
+        }
+
+        this.ui.displayImportExportStatus('Exporting, please wait...');
+        try {
+            // Assuming this.api.exportCsv will be added to ApiService
+            const csvDataString = await this.api.exportCsv();
+            if (csvDataString && typeof csvDataString === 'string') {
+                this.ui.triggerCsvDownload(csvDataString, 'expenses_export.csv');
+                this.ui.displayImportExportStatus('Export successful! Download should start automatically.', false, true);
+            } else {
+                this.ui.displayImportExportStatus('Export failed: No data received from server or data was invalid.', true);
+            }
+        } catch (error) {
+            console.error('Error during CSV export API call:', error);
+            this.ui.displayImportExportStatus(`Export API request failed: ${error.message}`, true);
+        }
+    }
+} // App class closing brace
 
 // Initialize the application when the DOM is fully loaded
 window.addEventListener('DOMContentLoaded', () => {

@@ -3,6 +3,9 @@
 const path = require('path'); // Kept for now, though its main use in _setupMiddleware is removed.
 const AuxDataRepository = require('../models/aux-data-repository');
 const ExpenseRepository = require('../models/expense-repository');
+const CsvService = require('../services/csv-service.js');
+const CsvRowParser = require('../services/CsvRowParser.js');
+const EntityManager = require('../services/EntityManager.js');
 // getDatabaseManager is not used here as dbManager is injected
 // express and bodyParser are not required here as app is injected and middleware is handled in the main server file.
 
@@ -16,6 +19,9 @@ class ExpenseManagerServerController {
         this.payerRepository = new AuxDataRepository(this.dbManager, 'payers', 'payer_id');
         this.paymentModeRepository = new AuxDataRepository(this.dbManager, 'payment_mode', 'payment_mode_id');
         this.expenseRepository = new ExpenseRepository(this.dbManager);
+        this.csvRowParser = new CsvRowParser();
+        this.entityManager = new EntityManager(this.dbManager);
+        this.csvService = new CsvService(this.dbManager, this.entityManager, this.csvRowParser);
 
         this._setupRoutes();
     }
@@ -57,6 +63,9 @@ class ExpenseManagerServerController {
         this.app.put('/api/expenses/:id', this._handleUpdateExpense.bind(this));
         this.app.delete('/api/expenses/:id', this._handleDeleteExpense.bind(this));
         this.app.get('/api/expenses/analytics', this._handleGetAnalyticsData.bind(this));
+        // CSV Import/Export Routes
+        this.app.post('/api/csv/import', this._handleCsvImport.bind(this));
+        this.app.get('/api/csv/export', this._handleCsvExport.bind(this));
     }
 
     // --- New Database Control Handlers ---
@@ -335,6 +344,45 @@ class ExpenseManagerServerController {
             return false;
         }
         return true;
+    }
+
+    // --- CSV Import/Export Handlers ---
+    async _handleCsvImport(req, res) {
+        if (!this.dbManager || !this.dbManager.pool) { // Check dbManager and its pool
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
+        const { csvData } = req.body;
+        if (!csvData || typeof csvData !== 'string') {
+            return res.status(400).json({ error: 'CSV data string is required in the request body as csvData.' });
+        }
+
+        try {
+            console.log("MainController: Attempting CSV import...");
+            const result = await this.csvService.importCsv(csvData);
+            console.log("MainController: CSV import result:", result);
+            res.json(result);
+        } catch (error) {
+            console.error('MainController: Error during CSV import:', error.message, error.stack);
+            res.status(500).json({ error: 'Failed to import CSV data.', details: error.message });
+        }
+    }
+
+    async _handleCsvExport(req, res) {
+        if (!this.dbManager || !this.dbManager.pool) { // Check dbManager and its pool
+            return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
+        }
+
+        try {
+            console.log("MainController: Attempting CSV export...");
+            const csvString = await this.csvService.exportCsv();
+            res.header('Content-Type', 'text/csv');
+            res.attachment('expenses_export.csv'); // Suggests filename for download
+            res.send(csvString);
+            console.log("MainController: CSV export successful.");
+        } catch (error) {
+            console.error('MainController: Error during CSV export:', error.message, error.stack);
+            res.status(500).json({ error: 'Failed to export CSV data.', details: error.message });
+        }
     }
 }
 
