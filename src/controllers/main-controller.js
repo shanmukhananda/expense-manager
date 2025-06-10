@@ -374,7 +374,12 @@ class ExpenseManagerServerController {
 
         try {
             console.log("MainController: Attempting CSV export...");
-            const csvString = await this.csvService.exportCsv();
+            const { startDate, endDate, expenseGroupId } = req.query;
+            const filters = { startDate, endDate, expenseGroupId };
+            // Ensure undefined or empty strings are passed if not present in req.query
+            // which is default behavior of destructuring from req.query.
+
+            const csvString = await this.csvService.exportCsv(filters);
             res.header('Content-Type', 'text/csv');
             res.attachment('expenses_export.csv'); // Suggests filename for download
             res.send(csvString);

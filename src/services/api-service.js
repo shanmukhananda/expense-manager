@@ -248,12 +248,29 @@ export class ApiService {
 
     /**
      * Exports CSV data from the backend API.
+     * @param {Object} [filters={}] - Optional filters for exporting data.
+     * @param {string} [filters.startDate] - Start date for filtering.
+     * @param {string} [filters.endDate] - End date for filtering.
+     * @param {string} [filters.expenseGroupId] - Expense group ID for filtering.
      * @returns {Promise<string>} Promise resolving to the CSV data as a string.
      * @throws {Error} If the network request fails or the server returns an error.
      */
-    async exportCsv() {
+    async exportCsv(filters = {}) {
         try {
-            const response = await fetch(`${this.baseUrl}/csv/export`); // GET request by default
+            const queryParams = new URLSearchParams();
+            if (filters.startDate) {
+                queryParams.append('startDate', filters.startDate);
+            }
+            if (filters.endDate) {
+                queryParams.append('endDate', filters.endDate);
+            }
+            if (filters.expenseGroupId) {
+                queryParams.append('expenseGroupId', filters.expenseGroupId);
+            }
+            const queryString = queryParams.toString();
+            const url = `${this.baseUrl}/csv/export${queryString ? `?${queryString}` : ''}`;
+
+            const response = await fetch(url); // GET request by default
             if (!response.ok) {
                 // Try to parse error as JSON, but fallback if not
                 let errorMessage = `HTTP error! Status: ${response.status}`;
