@@ -91,6 +91,12 @@ export class UIManager {
             dbConnectionString: document.getElementById('db-connection-string'),
             dbConnectToggle: document.getElementById('db-connect-toggle'),
             dbConnectionStatusMessage: null, // Will be created dynamically
+
+            // Export CSV Filter Elements
+            exportStartDate: document.getElementById('export-start-date'),
+            exportEndDate: document.getElementById('export-end-date'),
+            exportAllTime: document.getElementById('export-all-time'),
+            exportExpenseGroupSelect: document.getElementById('export-expense-group-select'),
         };
     }
 
@@ -130,8 +136,32 @@ export class UIManager {
 
         if (this.elements.exportCsvBtn) {
             this.elements.exportCsvBtn.addEventListener('click', async () => {
-                if (this.onExportCsv) await this.onExportCsv();
+                if (this.onExportCsv) {
+                    // The actual export logic (calling this.api.exportCsv(filters))
+                    // will be handled in app-controller.js by calling getExportFilters().
+                    await this.onExportCsv();
+                }
             });
+        }
+
+        // Listener for "All Time" checkbox in CSV export
+        if (this.elements.exportAllTime && this.elements.exportStartDate && this.elements.exportEndDate) {
+            this.elements.exportAllTime.addEventListener('change', () => {
+                const isChecked = this.elements.exportAllTime.checked;
+                this.elements.exportStartDate.disabled = isChecked;
+                this.elements.exportEndDate.disabled = isChecked;
+                if (isChecked) {
+                    this.elements.exportStartDate.value = '';
+                    this.elements.exportEndDate.value = '';
+                }
+            });
+            // Initial state based on checkbox default (checked)
+            this.elements.exportStartDate.disabled = this.elements.exportAllTime.checked;
+            this.elements.exportEndDate.disabled = this.elements.exportAllTime.checked;
+            if (this.elements.exportAllTime.checked) {
+                this.elements.exportStartDate.value = '';
+                this.elements.exportEndDate.value = '';
+            }
         }
     }
 
@@ -733,6 +763,49 @@ export class UIManager {
         this.populateDropdown(this.elements.editExpenseCategorySelect, data.categories, 'Select Category');
         this.populateDropdown(this.elements.editExpensePayerSelect, data.payers, 'Select Payer');
         this.populateDropdown(this.elements.editExpensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
+
+        // Also populate the export expense group dropdown if it exists
+        if (this.elements.exportExpenseGroupSelect && data.groups) {
+            this.populateExpenseGroupDropdown(data.groups);
+        }
+    }
+
+    /**
+     * Populates the export-specific expense group dropdown.
+     * @param {Array<Object>} groups - Array of group objects.
+     */
+    populateExpenseGroupDropdown(groups) {
+        const selectElement = this.elements.exportExpenseGroupSelect;
+        if (!selectElement) return;
+
+        selectElement.innerHTML = '<option value="">All Groups</option>'; // Default "All Groups"
+        if (groups) {
+            groups.forEach(group => {
+                const option = document.createElement('option');
+                option.value = group.id;
+                option.textContent = group.name;
+                selectElement.appendChild(option);
+            });
+        }
+    }
+
+    /**
+     * Gets the current CSV export filter values.
+     * @returns {Object} An object containing the filter values.
+     */
+    getExportFilters() {
+        const filters = {
+            startDate: this.elements.exportStartDate ? this.elements.exportStartDate.value : '',
+            endDate: this.elements.exportEndDate ? this.elements.exportEndDate.value : '',
+            allTime: this.elements.exportAllTime ? this.elements.exportAllTime.checked : true, // Default to true if element not found
+            expenseGroupId: this.elements.exportExpenseGroupSelect ? this.elements.exportExpenseGroupSelect.value : ''
+        };
+
+        if (filters.allTime) {
+            filters.startDate = '';
+            filters.endDate = '';
+        }
+        return filters;
     }
 
     /**
@@ -823,9 +896,22 @@ export class UIManager {
             this.elements.expenseDescription, this.elements.addExpenseBtn,
             this.elements.csvImportFile, this.elements.importCsvBtn,
             this.elements.exportCsvBtn,
+            // Add new export filter elements to be disabled/enabled
+            this.elements.exportStartDate,
+            this.elements.exportEndDate,
+            this.elements.exportAllTime,
+            this.elements.exportExpenseGroupSelect,
         ];
         formElements.forEach(el => {
-            if (el) el.disabled = !enabled;
+            if (el) {
+                // Special handling for "All Time" checkbox:
+                // Date fields should only be re-enabled if "All Time" is NOT checked.
+                if ((el === this.elements.exportStartDate || el === this.elements.exportEndDate) && this.elements.exportAllTime && this.elements.exportAllTime.checked) {
+                    el.disabled = true;
+                } else {
+                    el.disabled = !enabled;
+                }
+            }
         });
     }
 

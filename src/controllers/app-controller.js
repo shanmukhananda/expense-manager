@@ -539,8 +539,8 @@ class App {
 
         this.ui.displayImportExportStatus('Exporting, please wait...');
         try {
-            // Assuming this.api.exportCsv will be added to ApiService
-            const csvDataString = await this.api.exportCsv();
+            const filters = this.ui.getExportFilters(); // Get filters from UI
+            const csvDataString = await this.api.exportCsv(filters); // Pass filters to API
             if (csvDataString && typeof csvDataString === 'string') {
                 this.ui.triggerCsvDownload(csvDataString, 'expenses_export.csv');
                 this.ui.displayImportExportStatus('Export successful! Download should start automatically.', false, true);

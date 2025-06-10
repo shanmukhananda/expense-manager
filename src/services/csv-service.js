@@ -199,15 +199,45 @@ class CsvService {
     }
 
     /**
-     * Exports all expenses to a CSV string.
+     * Exports all expenses to a CSV string, optionally filtered.
+     * @param {Object} [filters={}] - Optional filters for exporting data.
+     * @param {string} [filters.startDate] - Start date for filtering (YYYY-MM-DD).
+     * @param {string} [filters.endDate] - End date for filtering (YYYY-MM-DD).
+     * @param {string} [filters.expenseGroupId] - Expense group ID for filtering.
      * @returns {Promise<string>} The CSV data as a string.
      */
-    async exportCsv() {
+    async exportCsv(filters = {}) {
         if (!this.dbManager) {
             throw new Error("CsvService is not properly initialized with dbManager.");
         }
 
-        console.log("CsvService: Starting CSV export process...");
+        console.log("CsvService: Starting CSV export process with filters:", filters);
+
+        let whereClauses = [];
+        let queryParams = [];
+        let paramIndex = 1;
+
+        if (filters.startDate && filters.endDate) {
+            whereClauses.push(`e.date BETWEEN $${paramIndex++} AND $${paramIndex++}`);
+            queryParams.push(filters.startDate, filters.endDate);
+        } else if (filters.startDate) {
+            whereClauses.push(`e.date >= $${paramIndex++}`);
+            queryParams.push(filters.startDate);
+        } else if (filters.endDate) {
+            whereClauses.push(`e.date <= $${paramIndex++}`);
+            queryParams.push(filters.endDate);
+        }
+
+        if (filters.expenseGroupId && filters.expenseGroupId !== '') {
+            whereClauses.push(`e.expense_group_id = $${paramIndex++}`);
+            queryParams.push(parseInt(filters.expenseGroupId));
+        }
+
+        let whereStatement = '';
+        if (whereClauses.length > 0) {
+            whereStatement = 'WHERE ' + whereClauses.join(' AND ');
+        }
+
         const query = `
             SELECT
                 e.date,
@@ -222,13 +252,15 @@ class CsvService {
             LEFT JOIN expense_categories ec ON e.expense_category_id = ec.id
             LEFT JOIN payers p ON e.payer_id = p.id
             LEFT JOIN payment_mode pm ON e.payment_mode_id = pm.id
+            ${whereStatement}
             ORDER BY e.date DESC;
         `;
 
         try {
-            const expensesData = await this.dbManager.runQuery(query);
+            console.log("CsvService: Executing query:", query, "with params:", queryParams);
+            const expensesData = await this.dbManager.runQuery(query, queryParams);
             if (!expensesData || expensesData.length === 0) {
-                console.log("CsvService: No expenses found to export.");
+                console.log("CsvService: No expenses found to export with the given filters.");
                 // Return CSV header even if no data
                 return stringify([], { header: true, columns: ['Date', 'Amount', 'Expense Category', 'Expense Description', 'Expense Group', 'Payer', 'Payment mode'] });
             }
