@@ -1,10 +1,4 @@
-// src/views/ui.js
 
-/**
- * UIManager class to handle all DOM manipulation and modal interactions.
- * It does not directly interact with data; it receives data to render and
- * emits events for actions (e.g., add, edit, delete).
- */
 export class UIManager {
     constructor() {
         this.elements = this._cacheDOMElements();
@@ -15,11 +9,6 @@ export class UIManager {
         this._setupEventListeners();
     }
 
-    /**
-     * Caches all necessary DOM elements.
-     * @private
-     * @returns {Object} An object containing references to DOM elements.
-     */
     _cacheDOMElements() {
         return {
             tabButtons: document.querySelectorAll('.tab-button'),
@@ -77,33 +66,25 @@ export class UIManager {
             editExpenseSaveBtn: document.getElementById('edit-expense-save-btn'),
             editExpenseCancelBtn: document.getElementById('edit-expense-cancel-btn'),
 
-            // Import/Export Tab Elements
             csvImportFile: document.getElementById('csv-import-file'),
             importCsvBtn: document.getElementById('import-csv-btn'),
             exportCsvBtn: document.getElementById('export-csv-btn'),
             importExportStatus: document.getElementById('import-export-status'),
-            // Analytics Tab Elements
             contentAnalytics: document.getElementById('content-analytics'),
             analyticsFiltersContainer: document.getElementById('analytics-filters-container'),
             analyticsResultsContainer: document.getElementById('analytics-results-container'),
 
-            // Database connection elements
             dbConnectionString: document.getElementById('db-connection-string'),
             dbConnectToggle: document.getElementById('db-connect-toggle'),
-            dbConnectionStatusMessage: null, // Will be created dynamically
+            dbConnectionStatusMessage: null,
 
-            // Export CSV Filter Elements
             exportStartDate: document.getElementById('export-start-date'),
             exportEndDate: document.getElementById('export-end-date'),
             exportAllTime: document.getElementById('export-all-time'),
-            exportExpenseGroupSelect: document.getElementById('export-expense-group-select'),
+            exportExpenseGroupCheckboxContainer: document.getElementById('export-expense-group-checkbox-container'),
         };
     }
 
-    /**
-     * Sets up all global and modal event listeners.
-     * @private
-     */
     _setupEventListeners() {
         this.elements.tabButtons.forEach(button => {
             button.addEventListener('click', (e) => this.onTabChange(e.currentTarget.id));
@@ -114,7 +95,7 @@ export class UIManager {
         this._setupInfoModalListeners();
         this._setupEditExpenseModalListeners();
 
-        this.elements.expenseDate.valueAsDate = new Date(); // Set today's date
+        this.elements.expenseDate.valueAsDate = new Date();
 
         if (this.elements.dbConnectToggle) {
             this.elements.dbConnectToggle.addEventListener('click', () => {
@@ -137,14 +118,11 @@ export class UIManager {
         if (this.elements.exportCsvBtn) {
             this.elements.exportCsvBtn.addEventListener('click', async () => {
                 if (this.onExportCsv) {
-                    // The actual export logic (calling this.api.exportCsv(filters))
-                    // will be handled in app-controller.js by calling getExportFilters().
                     await this.onExportCsv();
                 }
             });
         }
 
-        // Listener for "All Time" checkbox in CSV export
         if (this.elements.exportAllTime && this.elements.exportStartDate && this.elements.exportEndDate) {
             this.elements.exportAllTime.addEventListener('change', () => {
                 const isChecked = this.elements.exportAllTime.checked;
@@ -155,7 +133,6 @@ export class UIManager {
                     this.elements.exportEndDate.value = '';
                 }
             });
-            // Initial state based on checkbox default (checked)
             this.elements.exportStartDate.disabled = this.elements.exportAllTime.checked;
             this.elements.exportEndDate.disabled = this.elements.exportAllTime.checked;
             if (this.elements.exportAllTime.checked) {
@@ -165,10 +142,6 @@ export class UIManager {
         }
     }
 
-    /**
-     * Sets up event listeners for the rename modal.
-     * @private
-     */
     _setupRenameModalListeners() {
         this.elements.renameSaveBtn.addEventListener('click', () => {
             if (this.currentRenameCallback) {
@@ -179,10 +152,6 @@ export class UIManager {
         this.elements.renameCancelBtn.addEventListener('click', () => this.hideRenameModal());
     }
 
-    /**
-     * Sets up event listeners for the delete confirmation modal.
-     * @private
-     */
     _setupDeleteModalListeners() {
         this.elements.deleteConfirmBtn.addEventListener('click', () => {
             if (this.currentDeleteCallback) {
@@ -193,18 +162,10 @@ export class UIManager {
         this.elements.deleteCancelBtn.addEventListener('click', () => this.hideDeleteModal());
     }
 
-    /**
-     * Sets up event listeners for the info/error modal.
-     * @private
-     */
     _setupInfoModalListeners() {
         this.elements.infoModalOkBtn.addEventListener('click', () => this.hideInfoModal());
     }
 
-    /**
-     * Sets up event listeners for the edit expense modal.
-     * @private
-     */
     _setupEditExpenseModalListeners() {
         this.elements.editExpenseSaveBtn.addEventListener('click', () => {
             if (this.currentEditExpenseCallback) {
@@ -219,11 +180,6 @@ export class UIManager {
         this.elements.editExpenseCancelBtn.addEventListener('click', () => this.hideEditExpenseModal());
     }
 
-    /**
-     * Extracts form data from the edit expense modal.
-     * @private
-     * @returns {Object} The expense data from the form.
-     */
     _getEditExpenseFormData() {
         return {
             id: parseInt(this.elements.editExpenseId.value),
@@ -237,13 +193,6 @@ export class UIManager {
         };
     }
 
-    /**
-     * Validates expense form data.
-     * @private
-     * @param {Object} data - The expense data to validate.
-     * @param {boolean} isEdit - True if validating for edit, false for add.
-     * @returns {boolean} True if valid, false otherwise.
-     */
     _validateExpenseFormData(data, isEdit = false) {
         if (!data.date || isNaN(data.amount) || data.amount <= 0 ||
             isNaN(data.expense_group_id) || isNaN(data.expense_category_id) ||
@@ -257,64 +206,17 @@ export class UIManager {
         return true;
     }
 
-    /**
-     * Callback function to be set by the main app logic when a tab is clicked.
-     * @type {function(string): void}
-     */
     onTabChange = () => {};
-
-    /**
-     * Callback function for adding a group.
-     * @type {function(string): Promise<void>}
-     */
     onAddGroup = () => {};
-
-    /**
-     * Callback function for adding a category.
-     * @type {function(string): Promise<void>}
-     */
     onAddCategory = () => {};
-
-    /**
-     * Callback function for adding a payer.
-     * @type {function(string): Promise<void>}
-     */
     onAddPayer = () => {};
-
-    /**
-     * Callback function for adding a payment mode.
-     * @type {function(string): Promise<void>}
-     */
     onAddPaymentMode = () => {};
-
-    /**
-     * Callback function for adding an expense.
-     * @type {function(Object): Promise<void>}
-     */
     onAddExpense = () => {};
-
-    /**
-     * Callback function for editing an expense.
-     * @type {function(Object): Promise<void>}
-     */
     onEditExpense = () => {};
-
-    /**
-     * Callback for database connect/disconnect toggle.
-     * @type {function(): Promise<void>}
-     */
     onConnectToggle = async () => {};
-
-    /** @type {function(): Promise<void>} */
     onImportCsv = async () => {};
-
-    /** @type {function(): Promise<void>} */
     onExportCsv = async () => {};
 
-    /**
-     * Attaches add button listeners. This is called by the App class
-     * after setting up the callbacks.
-     */
     attachAddButtonListeners() {
         this.elements.addGroupBtn.addEventListener('click', () => this._handleAddEntity('group', this.elements.groupNameInput, this.onAddGroup));
         this.elements.addCategoryBtn.addEventListener('click', () => this._handleAddEntity('category', this.elements.categoryNameInput, this.onAddCategory));
@@ -323,13 +225,6 @@ export class UIManager {
         this.elements.addExpenseBtn.addEventListener('click', () => this._handleAddExpense());
     }
 
-    /**
-     * Generic handler for adding master data entities.
-     * @private
-     * @param {string} entityTypeName - The type of entity (e.g., 'group').
-     * @param {HTMLInputElement} inputElement - The input field for the entity name.
-     * @param {function(string): Promise<void>} addCallback - The callback to add the entity.
-     */
     async _handleAddEntity(entityTypeName, inputElement, addCallback) {
         const name = inputElement.value.trim();
         if (name) {
@@ -340,10 +235,6 @@ export class UIManager {
         }
     }
 
-    /**
-     * Handles adding a new expense.
-     * @private
-     */
     async _handleAddExpense() {
         const expenseData = {
             date: this.elements.expenseDate.value,
@@ -363,10 +254,6 @@ export class UIManager {
         this._clearAddExpenseForm();
     }
 
-    /**
-     * Clears the add expense form fields.
-     * @private
-     */
     _clearAddExpenseForm() {
         this.elements.expenseDate.valueAsDate = new Date();
         this.elements.expenseAmount.value = '';
@@ -617,12 +504,11 @@ export class UIManager {
      * @param {function(number): Promise<void>|null} onDelete - Callback for delete action. Can be null.
      */
     renderExpenses(expenses, containerElement, onEdit, onDelete) {
-        // const containerElement = this.elements.expensesList; // Remove this line
         if (!containerElement) {
             console.error("Render expenses called without a valid container.");
             return;
         }
-        containerElement.innerHTML = ''; // Clear the provided container
+        containerElement.innerHTML = '';
 
         if (!expenses || expenses.length === 0) {
             containerElement.innerHTML = `<p class="text-gray-500 text-center py-4">No expenses to display.</p>`;
@@ -632,22 +518,12 @@ export class UIManager {
         const sortedExpenses = [...expenses].sort((a, b) => new Date(b.date) - new Date(a.date));
 
         sortedExpenses.forEach(exp => {
-            // Pass onEdit and onDelete to _createExpenseListItem to decide if buttons should be rendered
             const expenseDiv = this._createExpenseListItem(exp, onEdit, onDelete);
-            // _addExpenseListItemListeners will also need to know about onEdit, onDelete to avoid errors
             this._addExpenseListItemListeners(expenseDiv, exp, onEdit, onDelete);
             containerElement.appendChild(expenseDiv);
         });
     }
 
-    /**
-     * Creates a single list item HTML element for an expense.
-     * @private
-     * @param {Object} exp - The expense object.
-     * @param {function(Object): Promise<void>|null} onEditCallback - Callback for edit action.
-     * @param {function(number): Promise<void>|null} onDeleteCallback - Callback for delete action.
-     * @returns {HTMLElement} The created div element.
-     */
     _getExpenseItemContentHTML(exp) {
         let contentHtml = `
             <div class="flex-grow w-full sm:w-auto">
@@ -673,7 +549,7 @@ export class UIManager {
 
     _getExpenseItemButtonsHTML(exp, onEditCallback, onDeleteCallback) {
         if (!onEditCallback || !onDeleteCallback) {
-            return ''; // No buttons if callbacks are not provided
+            return '';
         }
         return `
             <div class="flex gap-2 self-start sm:self-center mt-3 sm:mt-0">
@@ -715,7 +591,6 @@ export class UIManager {
             const editBtn = expenseDiv.querySelector('.edit-expense-btn');
             if (editBtn) {
                 editBtn.addEventListener('click', () => {
-                    // Call the onEditCallback, which is onEdit passed from renderExpenses
                     onEditCallback(exp);
                 });
             }
@@ -738,7 +613,7 @@ export class UIManager {
      * @param {string} defaultOptionText - Text for the default "Select..." option.
      */
     populateDropdown(selectElement, entities, defaultOptionText) {
-        selectElement.innerHTML = `<option value="">${defaultOptionText}</option>`; // Clear and add default
+        selectElement.innerHTML = `<option value="">${defaultOptionText}</option>`;
         if (entities) {
             entities.forEach(entity => {
                 const option = document.createElement('option');
@@ -764,28 +639,43 @@ export class UIManager {
         this.populateDropdown(this.elements.editExpensePayerSelect, data.payers, 'Select Payer');
         this.populateDropdown(this.elements.editExpensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
 
-        // Also populate the export expense group dropdown if it exists
-        if (this.elements.exportExpenseGroupSelect && data.groups) {
-            this.populateExpenseGroupDropdown(data.groups);
+        if (this.elements.exportExpenseGroupCheckboxContainer && data.groups) {
+            this.populateExpenseGroupCheckboxes(data.groups);
         }
     }
 
     /**
-     * Populates the export-specific expense group dropdown.
+     * Populates the export-specific expense group checkbox container.
      * @param {Array<Object>} groups - Array of group objects.
      */
-    populateExpenseGroupDropdown(groups) {
-        const selectElement = this.elements.exportExpenseGroupSelect;
-        if (!selectElement) return;
+    populateExpenseGroupCheckboxes(groups) {
+        const container = this.elements.exportExpenseGroupCheckboxContainer;
+        if (!container) return;
 
-        selectElement.innerHTML = '<option value="">All Groups</option>'; // Default "All Groups"
-        if (groups) {
+        container.innerHTML = '';
+
+        if (groups && groups.length > 0) {
             groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name;
-                selectElement.appendChild(option);
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `export-group-checkbox-${group.id}`;
+                checkbox.name = 'export-group-filter';
+                checkbox.value = group.id;
+                checkbox.className = 'mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500';
+
+                const label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.textContent = group.name;
+                label.className = 'text-sm text-gray-700';
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
             });
+        } else {
+            container.innerHTML = '<p class="text-gray-500 text-sm">No groups available to select.</p>';
         }
     }
 
@@ -797,9 +687,14 @@ export class UIManager {
         const filters = {
             startDate: this.elements.exportStartDate ? this.elements.exportStartDate.value : '',
             endDate: this.elements.exportEndDate ? this.elements.exportEndDate.value : '',
-            allTime: this.elements.exportAllTime ? this.elements.exportAllTime.checked : true, // Default to true if element not found
-            expenseGroupId: this.elements.exportExpenseGroupSelect ? this.elements.exportExpenseGroupSelect.value : ''
+            allTime: this.elements.exportAllTime ? this.elements.exportAllTime.checked : true, // Default to true
+            expenseGroupIds: []
         };
+
+        if (this.elements.exportExpenseGroupCheckboxContainer) {
+            const checkedCheckboxes = this.elements.exportExpenseGroupCheckboxContainer.querySelectorAll('input[name="export-group-filter"]:checked');
+            filters.expenseGroupIds = Array.from(checkedCheckboxes).map(cb => cb.value);
+        }
 
         if (filters.allTime) {
             filters.startDate = '';
@@ -846,11 +741,9 @@ export class UIManager {
     }
 
     _updateConnectionStatusMessage(isConnected, connectionMessage) {
-        const input = this.elements.dbConnectionString; // Used for parentNode reference
+        const input = this.elements.dbConnectionString;
         if (!this.elements.dbConnectionStatusMessage) {
             this.elements.dbConnectionStatusMessage = document.createElement('p');
-            // Ensure className is set before checking parentNode, though it's minor here.
-            // The class will be correctly set by the isConnected logic below.
             input.parentNode.insertBefore(this.elements.dbConnectionStatusMessage, input.nextSibling.nextSibling);
         }
         const statusMessageElement = this.elements.dbConnectionStatusMessage;
@@ -862,7 +755,7 @@ export class UIManager {
         const input = this.elements.dbConnectionString;
         input.disabled = isConnected;
         if (!isConnected) {
-            input.value = ''; // Clear input only when becoming disconnected
+            input.value = '';
         }
     }
 
@@ -876,7 +769,7 @@ export class UIManager {
 
         this._setMainUIEnabled(isConnected);
         if (isConnected) {
-            this.activateTab('tab-expenses'); // Activate Expenses tab by default on connect
+            this.activateTab('tab-expenses');
         }
     }
 
@@ -896,16 +789,13 @@ export class UIManager {
             this.elements.expenseDescription, this.elements.addExpenseBtn,
             this.elements.csvImportFile, this.elements.importCsvBtn,
             this.elements.exportCsvBtn,
-            // Add new export filter elements to be disabled/enabled
             this.elements.exportStartDate,
             this.elements.exportEndDate,
             this.elements.exportAllTime,
-            this.elements.exportExpenseGroupSelect,
+            this.elements.exportExpenseGroupCheckboxContainer,
         ];
         formElements.forEach(el => {
             if (el) {
-                // Special handling for "All Time" checkbox:
-                // Date fields should only be re-enabled if "All Time" is NOT checked.
                 if ((el === this.elements.exportStartDate || el === this.elements.exportEndDate) && this.elements.exportAllTime && this.elements.exportAllTime.checked) {
                     el.disabled = true;
                 } else {
@@ -913,6 +803,11 @@ export class UIManager {
                 }
             }
         });
+
+        if (this.elements.exportExpenseGroupCheckboxContainer) {
+            const checkboxes = this.elements.exportExpenseGroupCheckboxContainer.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => checkbox.disabled = !enabled);
+        }
     }
 
     _setTabContentsVisualState(enabled) {
@@ -937,17 +832,9 @@ export class UIManager {
                 this.elements.importExportStatus.classList.remove('text-red-600', 'text-green-600');
                 this.elements.importExportStatus.classList.add('text-gray-700');
             }
-        } else {
-            // Optionally, clear lists if they shouldn't retain old data when re-enabled before new data load
-            // For now, this is handled by render methods clearing their containers.
         }
     }
 
-    /**
-     * Enables or disables main UI elements.
-     * @private
-     * @param {boolean} enabled - True to enable, false to disable.
-     */
     _setMainUIEnabled(enabled) {
         this._setTabButtonsEnabled(enabled);
         this._setFormElementsEnabled(enabled);

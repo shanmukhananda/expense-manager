@@ -1,19 +1,17 @@
-// src/models/database.js
 
-const { Pool } = require('pg'); // Changed from sqlite3 to pg
+const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
 
 class DatabaseManager {
     /**
-     * @param {string} connectionString - The PostgreSQL connection string.
+     * @param {string | null} connectionString - The PostgreSQL connection string. Can be null initially.
      * @param {string} schemaPath - The path to the SQL schema file.
      */
     constructor(connectionString = null, schemaPath) {
-        // Allow connectionString to be optional or null
         this.connectionString = connectionString;
         this.schemaPath = schemaPath;
-        this.pool = null; // pg Pool instance
+        this.pool = null;
     }
 
     /**
@@ -26,7 +24,7 @@ class DatabaseManager {
     async initialize(newConnectionString = null) {
         if (newConnectionString) {
             if (this.pool) {
-                await this.close(); // Close existing connection if any
+                await this.close();
             }
             this.connectionString = newConnectionString;
         }
@@ -38,22 +36,19 @@ class DatabaseManager {
         this.pool = new Pool({ connectionString: this.connectionString });
 
         try {
-            // Test the connection
             const client = await this.pool.connect();
             console.log(`Connected to the PostgreSQL database.`);
-            client.release(); // Release client back to pool
+            client.release();
 
-            // Apply schema
             await this._applySchema();
             console.log('Database initialization completed successfully.');
         } catch (err) {
             console.error('Error initializing PostgreSQL database:', err.message);
-            // If pool was created, try to close it
             if (this.pool) {
                 await this.pool.end().catch(poolErr => console.error('Error closing pool during initialization failure:', poolErr));
             }
-            this.pool = null; // Ensure pool is null on failure
-            throw err; // Re-throw the error to indicate initialization failure
+            this.pool = null;
+            throw err;
         }
     }
 
@@ -73,7 +68,7 @@ class DatabaseManager {
             console.log('Schema applied successfully.');
         } catch (err) {
             console.error('Error applying schema:', err.message);
-            throw err; // Re-throw to be caught by the caller (initialize)
+            throw err;
         } finally {
             client.release();
         }
@@ -89,7 +84,6 @@ class DatabaseManager {
         if (!this.pool) {
             throw new Error('Database pool not initialized. Call initialize() first.');
         }
-        // Replace ? with $1, $2, etc. for pg
         const pgSql = sql.replace(/\?/g, (match, index, original) => {
             let i = 0;
             for (let j = 0; j < original.length && j < index; j++) {
@@ -116,11 +110,9 @@ class DatabaseManager {
         if (!this.pool) {
             throw new Error('Database pool not initialized. Call initialize() first.');
         }
-        // Replace ? with $1, $2, etc. for pg
         let paramIndex = 0;
         const pgSql = sql.replace(/\?/g, () => `$${++paramIndex}`);
 
-        // Append 'RETURNING id' to INSERT queries if not already present
         let finalSql = pgSql;
         if (pgSql.trim().toUpperCase().startsWith('INSERT') && !pgSql.toUpperCase().includes('RETURNING')) {
             finalSql += ' RETURNING id';
@@ -128,8 +120,6 @@ class DatabaseManager {
 
         try {
             const result = await this.pool.query(finalSql, params);
-            // For INSERT, result.rows[0].id will have the id if RETURNING id was used.
-            // For UPDATE/DELETE, result.rowCount provides the number of affected rows.
             return {
                 id: result.rows && result.rows.length > 0 ? result.rows[0].id : undefined,
                 changes: result.rowCount
@@ -151,13 +141,11 @@ class DatabaseManager {
                 console.log('Database pool closed.');
             } catch (err) {
                 console.error('Error closing database pool:', err.message);
-                // Set pool to null even if closing throws an error, to allow re-initialization attempt
                 this.pool = null;
                 throw err;
             }
-            this.pool = null; // Ensure pool is set to null after successful close
+            this.pool = null;
         }
-        // If this.pool is already null, do nothing.
     }
 }
 

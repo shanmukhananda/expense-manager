@@ -1,8 +1,6 @@
-// src/controllers/analytics-controller.js
 
 export class AnalyticsManager {
     /**
-     * Constructor for AnalyticsManager.
      * @param {UIManager} uiManager - Instance of UIManager for generic UI tasks (e.g., modals).
      * @param {HTMLElement} filtersContainer - The DOM element to host filter controls.
      * @param {HTMLElement} resultsContainer - The DOM element to display analytics results.
@@ -12,46 +10,30 @@ export class AnalyticsManager {
         this.filtersContainer = filtersContainer;
         this.resultsContainer = resultsContainer;
 
-        // These will store references to dynamically created/managed elements within the containers
         this.elements = {
             startDateInput: null,
             endDateInput: null,
             allTimeBtn: null,
-            categorySelect: null,
-            paymentModeSelect: null,
-            groupSelect: null, // Added
-            payerSelect: null,   // Added
+            categorySelect: null, // Will be null, kept for structure consistency if ever needed
+            paymentModeSelect: null, // Will be null
+            groupSelect: null, // Will be null
+            payerSelect: null,   // Will be null
             applyFiltersBtn: null,
         };
         this.onEditExpense = null;
         this.onDeleteExpense = null;
     }
 
-    /**
-     * Sets callback functions for handling expense edit and delete actions.
-     * These callbacks are typically provided by AppController and will be passed to UIManager.
-     * @param {Function|null} onEdit - Callback for editing an expense.
-     * @param {Function|null} onDelete - Callback for deleting an expense.
-     */
     setExpenseActionCallbacks(onEdit, onDelete) {
         this.onEditExpense = onEdit;
         this.onDeleteExpense = onDelete;
     }
 
-    /**
-     * Caches references to dynamically created filter input elements.
-     * This method will be called internally after filter HTML is rendered.
-     * @private
-     */
     _cacheFilterElements() {
         if (this.filtersContainer) {
             this.elements.startDateInput = this.filtersContainer.querySelector('#analytics-start-date');
             this.elements.endDateInput = this.filtersContainer.querySelector('#analytics-end-date');
             this.elements.allTimeBtn = this.filtersContainer.querySelector('#analytics-all-time-btn');
-            this.elements.categorySelect = this.filtersContainer.querySelector('#analytics-category-select');
-            this.elements.paymentModeSelect = this.filtersContainer.querySelector('#analytics-payment-mode-select');
-            this.elements.groupSelect = this.filtersContainer.querySelector('#analytics-group-select'); // Added
-            this.elements.payerSelect = this.filtersContainer.querySelector('#analytics-payer-select');   // Added
             this.elements.applyFiltersBtn = this.filtersContainer.querySelector('#analytics-apply-filters-btn');
         }
     }
@@ -76,55 +58,79 @@ export class AnalyticsManager {
     }
 
     _renderCategoryFilter(categories = []) {
+        const categoryCheckboxes = categories.map(category => `
+            <div>
+                <input type="checkbox" id="analytics-category-checkbox-${category.id}" name="analytics-category-filter" value="${category.id}" class="mr-2">
+                <label for="analytics-category-checkbox-${category.id}">${category.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Categories</h4>
-                <select id="analytics-category-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Categories</option>
-                    ${categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('')}
-                </select>
+                <div id="analytics-category-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${categoryCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderPaymentModeFilter(paymentModes = []) {
+        const paymentModeCheckboxes = paymentModes.map(pm => `
+            <div>
+                <input type="checkbox" id="analytics-payment-mode-checkbox-${pm.id}" name="analytics-payment-mode-filter" value="${pm.id}" class="mr-2">
+                <label for="analytics-payment-mode-checkbox-${pm.id}">${pm.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payment Modes</h4>
-                <select id="analytics-payment-mode-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Payment Modes</option>
-                    ${paymentModes.map(pm => `<option value="${pm.id}">${pm.name}</option>`).join('')}
-                </select>
+                <div id="analytics-payment-mode-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${paymentModeCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderGroupFilter(groups = []) {
+        const groupCheckboxes = groups.map(group => `
+            <div>
+                <input type="checkbox" id="analytics-group-checkbox-${group.id}" name="analytics-group-filter" value="${group.id}" class="mr-2">
+                <label for="analytics-group-checkbox-${group.id}">${group.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
-                <select id="analytics-group-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Groups</option>
-                    ${groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('')}
-                </select>
+                <div id="analytics-group-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${groupCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderPayerFilter(payers = []) {
+        const payerCheckboxes = payers.map(payer => `
+            <div>
+                <input type="checkbox" id="analytics-payer-checkbox-${payer.id}" name="analytics-payer-filter" value="${payer.id}" class="mr-2">
+                <label for="analytics-payer-checkbox-${payer.id}">${payer.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
-                <select id="analytics-payer-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Payers</option>
-                    ${payers.map(payer => `<option value="${payer.id}">${payer.name}</option>`).join('')}
-                </select>
+                <div id="analytics-payer-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${payerCheckboxes}
+                </div>
             </div>
         `;
     }
 
     renderAnalyticsFilters(masterData, applyFiltersCallback) {
-        this.filtersContainer.innerHTML = ''; // Clear previous filters
+        this.filtersContainer.innerHTML = '';
 
         const dateRangeHTML = this._renderDateRangeFilter();
         const categoryHTML = this._renderCategoryFilter(masterData.categories);
@@ -171,31 +177,30 @@ export class AnalyticsManager {
         const endDate = this.elements.endDateInput ? this.elements.endDateInput.value : '';
 
         let categoryIds = [];
-        if (this.elements.categorySelect) {
-            categoryIds = Array.from(this.elements.categorySelect.selectedOptions)
-                .map(opt => opt.value)
-                .filter(val => val !== ""); 
+        if (this.filtersContainer) {
+            categoryIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-category-filter"]:checked'))
+                .map(checkbox => checkbox.value)
+                .filter(val => val !== "");
         }
 
         let paymentModeIds = [];
-        if (this.elements.paymentModeSelect) {
-            paymentModeIds = Array.from(this.elements.paymentModeSelect.selectedOptions)
-                .map(opt => opt.value)
-                .filter(val => val !== ""); 
+        if (this.filtersContainer) {
+            paymentModeIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-payment-mode-filter"]:checked'))
+                .map(checkbox => checkbox.value)
+                .filter(val => val !== "");
         }
 
-        // Added for new filters
         let groupIds = [];
-        if (this.elements.groupSelect) {
-            groupIds = Array.from(this.elements.groupSelect.selectedOptions)
-                .map(opt => opt.value)
+        if (this.filtersContainer) {
+            groupIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-group-filter"]:checked'))
+                .map(checkbox => checkbox.value)
                 .filter(val => val !== "");
         }
 
         let payerIds = [];
-        if (this.elements.payerSelect) {
-            payerIds = Array.from(this.elements.payerSelect.selectedOptions)
-                .map(opt => opt.value)
+        if (this.filtersContainer) {
+            payerIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-payer-filter"]:checked'))
+                .map(checkbox => checkbox.value)
                 .filter(val => val !== "");
         }
 
@@ -204,8 +209,8 @@ export class AnalyticsManager {
             endDate,
             categoryIds,
             paymentModeIds,
-            groupIds, // Added
-            payerIds    // Added
+            groupIds,
+            payerIds
         };
     }
 
@@ -221,7 +226,7 @@ export class AnalyticsManager {
 
     _renderCategoryBreakdownTable(categoryBreakdown) {
         if (!categoryBreakdown || categoryBreakdown.length === 0) {
-            return ''; // Or a message like "<p>No category breakdown available.</p>" if preferred
+            return '';
         }
 
         let tableRowsHTML = '';
@@ -259,18 +264,17 @@ export class AnalyticsManager {
 
     _renderFilteredExpensesSection(filteredExpenses) {
         if (!filteredExpenses || filteredExpenses.length === 0) {
-            return ''; // Or a message if preferred
+            return '';
         }
         return `
             <h4 class="text-lg font-semibold text-gray-800 mt-6 mb-2">Filtered Expense Details (${filteredExpenses.length})</h4>
             <div id="analytics-filtered-expenses-list" class="max-h-[32rem] overflow-y-auto border border-gray-200 rounded-lg shadow-inner p-1 bg-gray-50 space-y-3">
-                <!-- Expense items will be rendered here by UIManager -->
             </div>
         `;
     }
 
     renderAnalyticsResults(analyticsData) {
-        this.resultsContainer.innerHTML = ''; // Clear previous results
+        this.resultsContainer.innerHTML = '';
 
         if (!analyticsData) {
             this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Analytics data is currently unavailable.</p>';
@@ -290,8 +294,6 @@ export class AnalyticsManager {
         let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount);
         resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
         
-        // Add a message if there's a total count, but no category breakdown AND no filtered expenses to list.
-        // This covers a specific edge case.
         if (totalFilteredCount > 0 &&
             (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
             (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
@@ -302,7 +304,6 @@ export class AnalyticsManager {
 
         this.resultsContainer.innerHTML = resultsHTML;
 
-        // Populate filtered expenses list
         if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
             const expenseListContainer = this.resultsContainer.querySelector('#analytics-filtered-expenses-list');
             if (expenseListContainer && this.uiManager && typeof this.uiManager.renderExpenses === 'function') {

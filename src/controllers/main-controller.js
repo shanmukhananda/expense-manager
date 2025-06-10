@@ -1,13 +1,10 @@
-// src/controllers/main_controller.js
 
-const path = require('path'); // Kept for now, though its main use in _setupMiddleware is removed.
+const path = require('path');
 const AuxDataRepository = require('../models/aux-data-repository');
 const ExpenseRepository = require('../models/expense-repository');
 const CsvService = require('../services/csv-service.js');
 const CsvRowParser = require('../services/CsvRowParser.js');
 const EntityManager = require('../services/EntityManager.js');
-// getDatabaseManager is not used here as dbManager is injected
-// express and bodyParser are not required here as app is injected and middleware is handled in the main server file.
 
 class ExpenseManagerServerController {
     constructor(dbManager, app) {
@@ -27,16 +24,12 @@ class ExpenseManagerServerController {
     }
 
     _setupRoutes() {
-        // --- Database Connection Routes ---
         this.app.post('/api/db/connect', this._handleDbConnect.bind(this));
         this.app.post('/api/db/disconnect', this._handleDbDisconnect.bind(this));
         this.app.get('/api/db/status', this._handleDbStatus.bind(this));
 
-        // Endpoint to initialize/check database (called by frontend on load)
-        // This might be deprecated or behave differently now. For now, keep it but guard it.
         this.app.get('/api/init-db', this._handleInitDb.bind(this));
 
-        // Generic CRUD routes for master data using repositories
         this.app.get('/api/groups', this._handleGetAll.bind(this, this.groupRepository));
         this.app.post('/api/groups', this._handleAdd.bind(this, this.groupRepository));
         this.app.put('/api/groups/:id', this._handleUpdate.bind(this, this.groupRepository));
@@ -57,32 +50,26 @@ class ExpenseManagerServerController {
         this.app.put('/api/payment-modes/:id', this._handleUpdate.bind(this, this.paymentModeRepository));
         this.app.delete('/api/payment-modes/:id', this._handleDelete.bind(this, this.paymentModeRepository));
 
-        // Expense specific routes using ExpenseRepository
         this.app.get('/api/expenses', this._handleGetAllExpenses.bind(this));
         this.app.post('/api/expenses', this._handleAddExpense.bind(this));
         this.app.put('/api/expenses/:id', this._handleUpdateExpense.bind(this));
         this.app.delete('/api/expenses/:id', this._handleDeleteExpense.bind(this));
         this.app.get('/api/expenses/analytics', this._handleGetAnalyticsData.bind(this));
-        // CSV Import/Export Routes
         this.app.post('/api/csv/import', this._handleCsvImport.bind(this));
         this.app.get('/api/csv/export', this._handleCsvExport.bind(this));
     }
 
-    // --- New Database Control Handlers ---
     async _handleDbConnect(req, res) {
         const { connectionString } = req.body;
         if (!connectionString) {
             return res.status(400).json({ success: false, message: 'Connection string is required.' });
         }
         try {
-            // If already connected, this.dbManager.initialize should handle closing the old pool
-            // and opening a new one. This depends on DatabaseManager's implementation.
-            // For safety, one might explicitly call this.dbManager.close() first if defined.
             if (this.dbManager.pool) {
                  console.log("DB Connect: Existing pool found, attempting to close before reconnecting.");
-                 await this.dbManager.close(); // Assuming close is graceful if no pool exists
+                 await this.dbManager.close();
             }
-            await this.dbManager.initialize(connectionString); // Assumes initialize can take a string
+            await this.dbManager.initialize(connectionString);
             res.json({ success: true, message: 'Database connected successfully.' });
         } catch (err) {
             console.error('Failed to connect to database:', err);
@@ -103,24 +90,15 @@ class ExpenseManagerServerController {
     }
 
     async _handleDbStatus(req, res) {
-        // Check if dbManager.pool is not null and has some indication of being active.
-        // The exact check might depend on the pg library's pool object structure.
-        // A simple check for pool existence is a starting point.
         const isConnected = !!this.dbManager.pool;
         res.json({ connected: isConnected });
     }
 
-    /**
-     * Handles the initial database setup request.
-     * NOTE: This endpoint's role might change. If the DB is connected via /api/db/connect,
-     * this might just be a status check or be deprecated.
-     */
     async _handleInitDb(req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first via /api/db/connect.' });
         }
         try {
-            // If dbManager.pool exists, assume it's initialized.
             res.status(200).send({ message: 'Database connection is active and schema should be initialized.' });
         } catch (error) {
             console.error('Database readiness check failed (though pool exists):', error);
@@ -128,9 +106,6 @@ class ExpenseManagerServerController {
         }
     }
 
-    /**
-     * Generic handler for fetching all records from a repository.
-     */
     async _handleGetAll(repository, req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
@@ -144,9 +119,6 @@ class ExpenseManagerServerController {
         }
     }
 
-    /**
-     * Generic handler for adding a new record via a repository.
-     */
     async _handleAdd(repository, req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
@@ -173,9 +145,6 @@ class ExpenseManagerServerController {
         }
     }
 
-    /**
-     * Generic handler for updating an existing record via a repository.
-     */
     async _handleUpdate(repository, req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
@@ -205,9 +174,6 @@ class ExpenseManagerServerController {
         }
     }
 
-    /**
-     * Generic handler for deleting a record via a repository.
-     */
     async _handleDelete(repository, req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
@@ -215,7 +181,7 @@ class ExpenseManagerServerController {
         const { id } = req.params;
         try {
             await repository.delete(id);
-            res.status(204).send(); // No content for successful deletion
+            res.status(204).send();
         } catch (err) {
             this._handleEntityDeleteError(err, repository, res);
         }
@@ -227,7 +193,6 @@ class ExpenseManagerServerController {
         } else if (err.code === 'SQLITE_CONSTRAINT_FOREIGNKEY' ||
                    (err.message && err.message.includes('FOREIGN KEY constraint failed')) ||
                    (err.message && err.message.includes('associated with existing expenses'))) {
-            // Provide a more user-friendly message for foreign key constraints
             const entityName = repository.tableName.endsWith('s') ? repository.tableName.slice(0, -1) : repository.tableName;
             res.status(400).json({ error: `Cannot delete this ${entityName} as it is associated with existing expenses or other records. Original: ${err.message}` });
         } else {
@@ -236,14 +201,12 @@ class ExpenseManagerServerController {
         }
     }
 
-    // Expense specific handlers, utilizing ExpenseRepository
     async _handleGetAllExpenses(req, res) {
         if (!this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
         }
         try {
-            // Pass true to filter by current month when DB is connected
-            const expenses = await this.expenseRepository.getAllExpenses(true); // New call
+            const expenses = await this.expenseRepository.getAllExpenses(true);
             res.json(expenses);
         } catch (err) {
             console.error('Error fetching expenses:', err.message);
@@ -257,7 +220,7 @@ class ExpenseManagerServerController {
         }
         const expenseData = req.body;
         if (!this._validateExpenseData(expenseData, res)) {
-            return; // Validation failed, response sent by _validateExpenseData
+            return;
         }
         try {
             const newExpense = await this.expenseRepository.addExpense(expenseData);
@@ -283,7 +246,7 @@ class ExpenseManagerServerController {
         const { id } = req.params;
         const expenseData = req.body;
         if (!this._validateExpenseData(expenseData, res, true)) {
-            return; // Validation failed, response sent by _validateExpenseData
+            return;
         }
         try {
             const updatedExpense = await this.expenseRepository.updateExpense(id, expenseData);
@@ -292,7 +255,6 @@ class ExpenseManagerServerController {
             if (err.message && err.message.includes('not found or no changes made')) {
                 res.status(404).json({ error: err.message });
             } else {
-                // Reuse the helper for foreign key and other generic errors
                 this._handleExpenseForeignKeyError(err, res, 'update');
             }
         }
@@ -320,10 +282,7 @@ class ExpenseManagerServerController {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
         }
         try {
-            // req.query contains the filter parameters from the frontend
-            // These are already strings, including comma-separated strings for IDs
-            const filters = req.query; 
-            
+            const filters = req.query;
             const analyticsData = await this.expenseRepository.getAnalyticsData(filters);
             res.json(analyticsData);
         } catch (err) {
@@ -332,10 +291,6 @@ class ExpenseManagerServerController {
         }
     }
 
-    /**
-     * Validates expense data for both creation and update operations.
-     * @private
-     */
     _validateExpenseData(expenseData, res, isUpdate = false) {
         const { expense_group_id, expense_category_id, payer_id, payment_mode_id, date, amount } = expenseData;
         if (!expense_group_id || !expense_category_id || !payer_id || !payment_mode_id || !date || amount === undefined || amount === null) {
@@ -346,9 +301,8 @@ class ExpenseManagerServerController {
         return true;
     }
 
-    // --- CSV Import/Export Handlers ---
     async _handleCsvImport(req, res) {
-        if (!this.dbManager || !this.dbManager.pool) { // Check dbManager and its pool
+        if (!this.dbManager || !this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
         }
         const { csvData } = req.body;
@@ -368,20 +322,18 @@ class ExpenseManagerServerController {
     }
 
     async _handleCsvExport(req, res) {
-        if (!this.dbManager || !this.dbManager.pool) { // Check dbManager and its pool
+        if (!this.dbManager || !this.dbManager.pool) {
             return res.status(503).json({ error: 'Database not connected. Please connect to the database first.' });
         }
 
         try {
             console.log("MainController: Attempting CSV export...");
-            const { startDate, endDate, expenseGroupId } = req.query;
-            const filters = { startDate, endDate, expenseGroupId };
-            // Ensure undefined or empty strings are passed if not present in req.query
-            // which is default behavior of destructuring from req.query.
+            const { startDate, endDate, expenseGroupIds } = req.query;
+            const filters = { startDate, endDate, expenseGroupIds };
 
             const csvString = await this.csvService.exportCsv(filters);
             res.header('Content-Type', 'text/csv');
-            res.attachment('expenses_export.csv'); // Suggests filename for download
+            res.attachment('expenses_export.csv');
             res.send(csvString);
             console.log("MainController: CSV export successful.");
         } catch (error) {

@@ -1,6 +1,3 @@
-// import { parse } from 'csv-parse/sync'; // For CSV string parsing
-// import { stringify } from 'csv-stringify/sync'; // For CSV string generation
-// Note: Using require for now as the project seems to use CommonJS primarily
 const { parse } = require('csv-parse/sync');
 const { stringify } = require('csv-stringify/sync');
 const EntityManager = require('./EntityManager.js');
@@ -9,12 +6,10 @@ const CsvRowParser = require('./CsvRowParser.js');
 class CsvService {
     constructor(dbManager, entityManager, csvRowParser) {
         this.dbManager = dbManager;
-        this.entityManager = entityManager; // Expecting an instance of EntityManager
-        this.csvRowParser = csvRowParser;   // Expecting an instance of CsvRowParser
+        this.entityManager = entityManager;
+        this.csvRowParser = csvRowParser;
         this.processedRows = [];
     }
-
-    // --- Methods adapted from CsvImporter ---
 
     async _findOrCreateCategory(categoryName) {
         return this.entityManager.findOrCreateEntity('expense_categories', categoryName.trim(), 'name', 'Category');
@@ -22,7 +17,7 @@ class CsvService {
 
     async _fetchRelatedEntityIds(parsedRowData) {
         const { categoryStr, groupStr, payerStr, modeStr } = parsedRowData;
-        const categoryId = await this._findOrCreateCategory(categoryStr); // Uses injected entityManager
+        const categoryId = await this._findOrCreateCategory(categoryStr);
         const expenseGroupId = await this.entityManager.findOrCreateEntity('expense_groups', groupStr, 'name', 'Expense Group');
         const payerId = await this.entityManager.findOrCreateEntity('payers', payerStr, 'name', 'Payer');
         const paymentModeId = await this.entityManager.findOrCreateEntity('payment_mode', modeStr, 'name', 'Payment Mode');
@@ -30,11 +25,9 @@ class CsvService {
     }
 
     async _processRow(rawCsvRowData) {
-        // rawCsvRowData is an object representing a row, e.g., { Header1: 'value1', Header2: 'value2' }
         try {
-            const parsedRowData = this.csvRowParser.parse(rawCsvRowData); // Uses injected csvRowParser
+            const parsedRowData = this.csvRowParser.parse(rawCsvRowData);
             if (!parsedRowData) {
-                // console.warn('CsvService: Skipping row due to parsing error (logged by CsvRowParser). Original data:', rawCsvRowData);
                 return null;
             }
 
@@ -49,7 +42,7 @@ class CsvService {
             return {
                 date, amount, description: descriptionStr,
                 ...entityIds,
-                originalRow // Keep originalRow for context if needed for logging in _insertSingleExpense
+                originalRow
             };
         } catch (error) {
             console.error('CsvService: Error processing a single row, skipping. Error:', error.message, 'Row data:', rawCsvRowData);
@@ -79,14 +72,12 @@ class CsvService {
                     failedInserts++;
                 }
             } catch (error) {
-                // Error already logged by _insertSingleExpense or _processRow
                 failedInserts++;
             }
         }
 
         console.log(`CsvService: Expense Insertion Summary: ${successfulInserts} succeeded, ${failedInserts} failed.`);
         if (failedInserts > 0) {
-            // Don't throw an error here, let the caller decide based on counts
             console.warn(`CsvService: ${failedInserts} expenses failed to insert. See logs for details.`);
         }
         return { successfulInserts, failedInserts, insertedIds };
@@ -101,7 +92,7 @@ class CsvService {
             expenseGroupId,
             payerId,
             paymentModeId,
-            originalRow // For logging context
+            originalRow
         } = processedRowData;
 
         const sql = `
@@ -116,7 +107,6 @@ class CsvService {
         ];
 
         try {
-            // Ensure dbManager is available
             if (!this.dbManager) {
                 console.error('CsvService: dbManager is not initialized in _insertSingleExpense.');
                 throw new Error('Database manager not available for inserting expense.');
@@ -134,8 +124,6 @@ class CsvService {
             throw error;
         }
     }
-
-    // --- New public methods for UI interaction ---
 
     /**
      * Imports expenses from a CSV file content.
@@ -155,7 +143,7 @@ class CsvService {
 
         try {
             const records = parse(fileContents, {
-                columns: true, // Assumes first row is header
+                columns: true,
                 skip_empty_lines: true,
                 trim: true,
             });
@@ -163,12 +151,10 @@ class CsvService {
             console.log(`CsvService: Parsed ${totalRows} records from CSV string.`);
 
             for (const record of records) {
-                const processed = await this._processRow(record); // processRow expects an object
+                const processed = await this._processRow(record);
                 if (processed) {
                     processedRowsForDb.push(processed);
                 } else {
-                    // Error/skip already logged by _processRow or CsvRowParser
-                    // We could collect specific errors from CsvRowParser if it returned them
                     parseErrors.push({ message: "Row processing failed or skipped", data: record });
                 }
             }
@@ -177,10 +163,9 @@ class CsvService {
 
         } catch (error) {
             console.error('CsvService: Error parsing CSV string:', error.message);
-            // If parsing itself fails, we can't proceed to insert.
             return {
                 successfulInserts: 0,
-                failedInserts: totalRows, // All rows failed if parsing bombs
+                failedInserts: totalRows,
                 totalRows,
                 insertedIds: [],
                 errors: [{ message: `CSV parsing failed: ${error.message}` }]
@@ -191,10 +176,10 @@ class CsvService {
 
         return {
             successfulInserts: insertResults.successfulInserts,
-            failedInserts: (totalRows - insertResults.successfulInserts), // More accurate failed count
+            failedInserts: (totalRows - insertResults.successfulInserts),
             totalRows,
             insertedIds: insertResults.insertedIds,
-            errors: parseErrors // Add errors encountered during row processing (if any)
+            errors: parseErrors
         };
     }
 
@@ -203,7 +188,7 @@ class CsvService {
      * @param {Object} [filters={}] - Optional filters for exporting data.
      * @param {string} [filters.startDate] - Start date for filtering (YYYY-MM-DD).
      * @param {string} [filters.endDate] - End date for filtering (YYYY-MM-DD).
-     * @param {string} [filters.expenseGroupId] - Expense group ID for filtering.
+     * @param {string} [filters.expenseGroupIds] - Comma-separated string of expense group IDs for filtering.
      * @returns {Promise<string>} The CSV data as a string.
      */
     async exportCsv(filters = {}) {
@@ -228,9 +213,16 @@ class CsvService {
             queryParams.push(filters.endDate);
         }
 
-        if (filters.expenseGroupId && filters.expenseGroupId !== '') {
-            whereClauses.push(`e.expense_group_id = $${paramIndex++}`);
-            queryParams.push(parseInt(filters.expenseGroupId));
+        if (filters.expenseGroupIds && typeof filters.expenseGroupIds === 'string' && filters.expenseGroupIds.trim() !== '') {
+            const groupIds = filters.expenseGroupIds.split(',')
+                .map(id => parseInt(id.trim()))
+                .filter(id => !isNaN(id));
+
+            if (groupIds.length > 0) {
+                const placeholders = groupIds.map(() => `$${paramIndex++}`).join(',');
+                whereClauses.push(`e.expense_group_id IN (${placeholders})`);
+                queryParams.push(...groupIds);
+            }
         }
 
         let whereStatement = '';
@@ -261,11 +253,9 @@ class CsvService {
             const expensesData = await this.dbManager.runQuery(query, queryParams);
             if (!expensesData || expensesData.length === 0) {
                 console.log("CsvService: No expenses found to export with the given filters.");
-                // Return CSV header even if no data
                 return stringify([], { header: true, columns: ['Date', 'Amount', 'Expense Category', 'Expense Description', 'Expense Group', 'Payer', 'Payment mode'] });
             }
 
-            // Format date to DD-Mon-YYYY for export consistency with expected import format (if any)
             const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
             const formattedData = expensesData.map(row => {
                 const dateObj = new Date(row.date);
@@ -280,7 +270,7 @@ class CsvService {
 
             const csvString = stringify(formattedData, {
                 header: true,
-                columns: [ // Define column order and headers explicitly
+                columns: [
                     { key: 'date', header: 'Date' },
                     { key: 'amount', header: 'Amount' },
                     { key: 'Expense Category', header: 'Expense Category' },
@@ -294,7 +284,7 @@ class CsvService {
             return csvString;
         } catch (error) {
             console.error('CsvService: Error exporting CSV data:', error.message);
-            throw error; // Re-throw to be handled by the caller
+            throw error;
         }
     }
 }

@@ -1,6 +1,5 @@
 class CsvRowParser {
     constructor() {
-        // No specific constructor arugments needed for now
     }
 
     _parseDate(dateStr, originalRowForRowContext, fieldName = 'Date') {
@@ -40,17 +39,13 @@ class CsvRowParser {
     }
 
     _validateParsedData(rowData, originalRow) {
-        // This method assumes rowData contains already parsed date and amount
         const {
             date, amount, categoryStr, groupStr, payerStr, modeStr
         } = rowData;
 
-        // Headers presence is implicitly checked by trying to access them before this stage.
-        // Parsers (_parseDate, _parseAmount) handle their specific missing/empty/format checks.
-        if (date === null) return false; // Error already logged by _parseDate
-        if (amount === null) return false; // Error already logged by _parseAmount
+        if (date === null) return false;
+        if (amount === null) return false;
 
-        // Check other required string fields for emptiness
         const requiredStringFields = {
             'Expense Category': categoryStr,
             'Expense Group': groupStr,
@@ -103,7 +98,7 @@ class CsvRowParser {
         };
 
         if (!this._validateParsedData(parsedRowContent, rawRow)) {
-            return null; // Validation failed, message already logged
+            return null;
         }
 
         return {

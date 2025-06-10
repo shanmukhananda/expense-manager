@@ -1,4 +1,3 @@
-// src/models/repositories/expense-repository.js
 
 class ExpenseRepository {
     constructor(dbManager) {
@@ -7,7 +6,7 @@ class ExpenseRepository {
 
     /**
      * Fetches all expenses with joined details.
-     * @param {boolean} filterByCurrentMonth - Optional. If true, filters expenses by the current month.
+     * @param {boolean} [filterByCurrentMonth=false] - If true, filters expenses by the current month.
      * @returns {Promise<Array<Object>>}
      */
     async getAllExpenses(filterByCurrentMonth = false) {
@@ -33,7 +32,6 @@ class ExpenseRepository {
     `;
         const params = [];
         if (filterByCurrentMonth) {
-            // Assuming PostgreSQL syntax for current month
             sql += ` WHERE TO_CHAR(e.date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
         }
         sql += ` ORDER BY e.date DESC`;
@@ -122,7 +120,6 @@ class ExpenseRepository {
         const whereClauses = [];
         let paramIndex = 1;
 
-        // Helper function to process and add ID-based filters
         const addIdFilter = (filterValue, columnName) => {
             let ids = filterValue;
             if (typeof ids === 'string') {
@@ -180,7 +177,7 @@ class ExpenseRepository {
         for (const categoryId in categoryTotals) {
             const totalAmount = categoryTotals[categoryId];
             const percentage = overallTotal === 0 ? 0 : (totalAmount / overallTotal) * 100;
-            const representativeRow = rows.find(r => r.expense_category_id == categoryId); // Safe due to rows.length check
+            const representativeRow = rows.find(r => r.expense_category_id == categoryId);
             categoryBreakdown.push({
                 categoryId: parseInt(categoryId),
                 categoryName: representativeRow ? representativeRow.category_name : 'Unknown Category',
@@ -206,7 +203,7 @@ class ExpenseRepository {
 
         return {
             ...aggregatedData,
-            filteredExpenses: rows // The raw rows are the filtered expenses
+            filteredExpenses: rows
         };
     }
 }
