@@ -203,7 +203,7 @@ class CsvService {
      * @param {Object} [filters={}] - Optional filters for exporting data.
      * @param {string} [filters.startDate] - Start date for filtering (YYYY-MM-DD).
      * @param {string} [filters.endDate] - End date for filtering (YYYY-MM-DD).
-     * @param {string} [filters.expenseGroupId] - Expense group ID for filtering.
+     * @param {string} [filters.expenseGroupIds] - Comma-separated string of expense group IDs for filtering.
      * @returns {Promise<string>} The CSV data as a string.
      */
     async exportCsv(filters = {}) {
@@ -228,9 +228,16 @@ class CsvService {
             queryParams.push(filters.endDate);
         }
 
-        if (filters.expenseGroupId && filters.expenseGroupId !== '') {
-            whereClauses.push(`e.expense_group_id = $${paramIndex++}`);
-            queryParams.push(parseInt(filters.expenseGroupId));
+        if (filters.expenseGroupIds && typeof filters.expenseGroupIds === 'string' && filters.expenseGroupIds.trim() !== '') {
+            const groupIds = filters.expenseGroupIds.split(',')
+                .map(id => parseInt(id.trim()))
+                .filter(id => !isNaN(id)); // Ensure they are numbers
+
+            if (groupIds.length > 0) {
+                const placeholders = groupIds.map(() => `$${paramIndex++}`).join(',');
+                whereClauses.push(`e.expense_group_id IN (${placeholders})`);
+                queryParams.push(...groupIds);
+            }
         }
 
         let whereStatement = '';

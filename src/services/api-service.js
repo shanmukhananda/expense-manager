@@ -264,8 +264,9 @@ export class ApiService {
             if (filters.endDate) {
                 queryParams.append('endDate', filters.endDate);
             }
-            if (filters.expenseGroupId) {
-                queryParams.append('expenseGroupId', filters.expenseGroupId);
+            // Handle expenseGroupIds as an array
+            if (filters.expenseGroupIds && Array.isArray(filters.expenseGroupIds) && filters.expenseGroupIds.length > 0) {
+                queryParams.append('expenseGroupIds', filters.expenseGroupIds.join(','));
             }
             const queryString = queryParams.toString();
             const url = `${this.baseUrl}/csv/export${queryString ? `?${queryString}` : ''}`;

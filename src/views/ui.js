@@ -96,7 +96,7 @@ export class UIManager {
             exportStartDate: document.getElementById('export-start-date'),
             exportEndDate: document.getElementById('export-end-date'),
             exportAllTime: document.getElementById('export-all-time'),
-            exportExpenseGroupSelect: document.getElementById('export-expense-group-select'),
+            exportExpenseGroupCheckboxContainer: document.getElementById('export-expense-group-checkbox-container'),
         };
     }
 
@@ -764,28 +764,44 @@ export class UIManager {
         this.populateDropdown(this.elements.editExpensePayerSelect, data.payers, 'Select Payer');
         this.populateDropdown(this.elements.editExpensePaymentModeSelect, data.paymentModes, 'Select Payment Mode');
 
-        // Also populate the export expense group dropdown if it exists
-        if (this.elements.exportExpenseGroupSelect && data.groups) {
-            this.populateExpenseGroupDropdown(data.groups);
+        // Also populate the export expense group checkboxes if the container exists
+        if (this.elements.exportExpenseGroupCheckboxContainer && data.groups) {
+            this.populateExpenseGroupCheckboxes(data.groups);
         }
     }
 
     /**
-     * Populates the export-specific expense group dropdown.
+     * Populates the export-specific expense group checkbox container.
      * @param {Array<Object>} groups - Array of group objects.
      */
-    populateExpenseGroupDropdown(groups) {
-        const selectElement = this.elements.exportExpenseGroupSelect;
-        if (!selectElement) return;
+    populateExpenseGroupCheckboxes(groups) {
+        const container = this.elements.exportExpenseGroupCheckboxContainer;
+        if (!container) return;
 
-        selectElement.innerHTML = '<option value="">All Groups</option>'; // Default "All Groups"
-        if (groups) {
+        container.innerHTML = ''; // Clear existing content
+
+        if (groups && groups.length > 0) {
             groups.forEach(group => {
-                const option = document.createElement('option');
-                option.value = group.id;
-                option.textContent = group.name;
-                selectElement.appendChild(option);
+                const div = document.createElement('div');
+                div.className = 'flex items-center';
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.id = `export-group-checkbox-${group.id}`;
+                checkbox.name = 'export-group-filter';
+                checkbox.value = group.id;
+                checkbox.className = 'mr-2 h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500';
+
+                const label = document.createElement('label');
+                label.htmlFor = checkbox.id;
+                label.textContent = group.name;
+                label.className = 'text-sm text-gray-700';
+
+                div.appendChild(checkbox);
+                div.appendChild(label);
+                container.appendChild(div);
             });
+        } else {
+            container.innerHTML = '<p class="text-gray-500 text-sm">No groups available to select.</p>';
         }
     }
 
@@ -797,9 +813,14 @@ export class UIManager {
         const filters = {
             startDate: this.elements.exportStartDate ? this.elements.exportStartDate.value : '',
             endDate: this.elements.exportEndDate ? this.elements.exportEndDate.value : '',
-            allTime: this.elements.exportAllTime ? this.elements.exportAllTime.checked : true, // Default to true if element not found
-            expenseGroupId: this.elements.exportExpenseGroupSelect ? this.elements.exportExpenseGroupSelect.value : ''
+            allTime: this.elements.exportAllTime ? this.elements.exportAllTime.checked : true,
+            expenseGroupIds: []
         };
+
+        if (this.elements.exportExpenseGroupCheckboxContainer) {
+            const checkedCheckboxes = this.elements.exportExpenseGroupCheckboxContainer.querySelectorAll('input[name="export-group-filter"]:checked');
+            filters.expenseGroupIds = Array.from(checkedCheckboxes).map(cb => cb.value);
+        }
 
         if (filters.allTime) {
             filters.startDate = '';
@@ -900,7 +921,7 @@ export class UIManager {
             this.elements.exportStartDate,
             this.elements.exportEndDate,
             this.elements.exportAllTime,
-            this.elements.exportExpenseGroupSelect,
+            this.elements.exportExpenseGroupCheckboxContainer, // Main container
         ];
         formElements.forEach(el => {
             if (el) {
@@ -913,6 +934,12 @@ export class UIManager {
                 }
             }
         });
+
+        // Also disable/enable all checkboxes within the container
+        if (this.elements.exportExpenseGroupCheckboxContainer) {
+            const checkboxes = this.elements.exportExpenseGroupCheckboxContainer.querySelectorAll('input[type="checkbox"]');
+            checkboxes.forEach(checkbox => checkbox.disabled = !enabled);
+        }
     }
 
     _setTabContentsVisualState(enabled) {

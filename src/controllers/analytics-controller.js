@@ -48,10 +48,11 @@ export class AnalyticsManager {
             this.elements.startDateInput = this.filtersContainer.querySelector('#analytics-start-date');
             this.elements.endDateInput = this.filtersContainer.querySelector('#analytics-end-date');
             this.elements.allTimeBtn = this.filtersContainer.querySelector('#analytics-all-time-btn');
-            this.elements.categorySelect = this.filtersContainer.querySelector('#analytics-category-select');
-            this.elements.paymentModeSelect = this.filtersContainer.querySelector('#analytics-payment-mode-select');
-            this.elements.groupSelect = this.filtersContainer.querySelector('#analytics-group-select'); // Added
-            this.elements.payerSelect = this.filtersContainer.querySelector('#analytics-payer-select');   // Added
+            // Removed caching of select elements as they are replaced by checkbox groups
+            // this.elements.categorySelect = this.filtersContainer.querySelector('#analytics-category-select');
+            // this.elements.paymentModeSelect = this.filtersContainer.querySelector('#analytics-payment-mode-select');
+            // this.elements.groupSelect = this.filtersContainer.querySelector('#analytics-group-select');
+            // this.elements.payerSelect = this.filtersContainer.querySelector('#analytics-payer-select');
             this.elements.applyFiltersBtn = this.filtersContainer.querySelector('#analytics-apply-filters-btn');
         }
     }
@@ -76,49 +77,73 @@ export class AnalyticsManager {
     }
 
     _renderCategoryFilter(categories = []) {
+        const categoryCheckboxes = categories.map(category => `
+            <div>
+                <input type="checkbox" id="analytics-category-checkbox-${category.id}" name="analytics-category-filter" value="${category.id}" class="mr-2">
+                <label for="analytics-category-checkbox-${category.id}">${category.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Categories</h4>
-                <select id="analytics-category-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Categories</option>
-                    ${categories.map(category => `<option value="${category.id}">${category.name}</option>`).join('')}
-                </select>
+                <div id="analytics-category-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${categoryCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderPaymentModeFilter(paymentModes = []) {
+        const paymentModeCheckboxes = paymentModes.map(pm => `
+            <div>
+                <input type="checkbox" id="analytics-payment-mode-checkbox-${pm.id}" name="analytics-payment-mode-filter" value="${pm.id}" class="mr-2">
+                <label for="analytics-payment-mode-checkbox-${pm.id}">${pm.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payment Modes</h4>
-                <select id="analytics-payment-mode-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Payment Modes</option>
-                    ${paymentModes.map(pm => `<option value="${pm.id}">${pm.name}</option>`).join('')}
-                </select>
+                <div id="analytics-payment-mode-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${paymentModeCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderGroupFilter(groups = []) {
+        const groupCheckboxes = groups.map(group => `
+            <div>
+                <input type="checkbox" id="analytics-group-checkbox-${group.id}" name="analytics-group-filter" value="${group.id}" class="mr-2">
+                <label for="analytics-group-checkbox-${group.id}">${group.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
-                <select id="analytics-group-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Groups</option>
-                    ${groups.map(group => `<option value="${group.id}">${group.name}</option>`).join('')}
-                </select>
+                <div id="analytics-group-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${groupCheckboxes}
+                </div>
             </div>
         `;
     }
 
     _renderPayerFilter(payers = []) {
+        const payerCheckboxes = payers.map(payer => `
+            <div>
+                <input type="checkbox" id="analytics-payer-checkbox-${payer.id}" name="analytics-payer-filter" value="${payer.id}" class="mr-2">
+                <label for="analytics-payer-checkbox-${payer.id}">${payer.name}</label>
+            </div>
+        `).join('');
+
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
-                <select id="analytics-payer-select" multiple class="mt-1 block w-full p-2 border border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 h-32">
-                    <option value="">All Payers</option>
-                    ${payers.map(payer => `<option value="${payer.id}">${payer.name}</option>`).join('')}
-                </select>
+                <div id="analytics-payer-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
+                    ${payerCheckboxes}
+                </div>
             </div>
         `;
     }
@@ -171,31 +196,30 @@ export class AnalyticsManager {
         const endDate = this.elements.endDateInput ? this.elements.endDateInput.value : '';
 
         let categoryIds = [];
-        if (this.elements.categorySelect) {
-            categoryIds = Array.from(this.elements.categorySelect.selectedOptions)
-                .map(opt => opt.value)
-                .filter(val => val !== ""); 
+        if (this.filtersContainer) {
+            categoryIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-category-filter"]:checked'))
+                .map(checkbox => checkbox.value)
+                .filter(val => val !== "");
         }
 
         let paymentModeIds = [];
-        if (this.elements.paymentModeSelect) {
-            paymentModeIds = Array.from(this.elements.paymentModeSelect.selectedOptions)
-                .map(opt => opt.value)
-                .filter(val => val !== ""); 
+        if (this.filtersContainer) {
+            paymentModeIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-payment-mode-filter"]:checked'))
+                .map(checkbox => checkbox.value)
+                .filter(val => val !== "");
         }
 
-        // Added for new filters
         let groupIds = [];
-        if (this.elements.groupSelect) {
-            groupIds = Array.from(this.elements.groupSelect.selectedOptions)
-                .map(opt => opt.value)
+        if (this.filtersContainer) {
+            groupIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-group-filter"]:checked'))
+                .map(checkbox => checkbox.value)
                 .filter(val => val !== "");
         }
 
         let payerIds = [];
-        if (this.elements.payerSelect) {
-            payerIds = Array.from(this.elements.payerSelect.selectedOptions)
-                .map(opt => opt.value)
+        if (this.filtersContainer) {
+            payerIds = Array.from(this.filtersContainer.querySelectorAll('input[name="analytics-payer-filter"]:checked'))
+                .map(checkbox => checkbox.value)
                 .filter(val => val !== "");
         }
 

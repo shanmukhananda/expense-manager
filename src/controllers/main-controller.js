@@ -374,8 +374,9 @@ class ExpenseManagerServerController {
 
         try {
             console.log("MainController: Attempting CSV export...");
-            const { startDate, endDate, expenseGroupId } = req.query;
-            const filters = { startDate, endDate, expenseGroupId };
+            // Updated to use expenseGroupIds (plural)
+            const { startDate, endDate, expenseGroupIds } = req.query;
+            const filters = { startDate, endDate, expenseGroupIds };
             // Ensure undefined or empty strings are passed if not present in req.query
             // which is default behavior of destructuring from req.query.
 
