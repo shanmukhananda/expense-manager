@@ -1,23 +1,19 @@
 class EntityManager {
     constructor(dbManager) {
         this.dbManager = dbManager;
-        this.entityCreationLocks = new Map(); // For concurrency control
+        this.entityCreationLocks = new Map();
     }
 
     async _findEntity(tableName, entityNameColumn, entityName, logPrefix = 'Entity', lockKey = '', isRefetch = false) {
         const action = isRefetch ? "final SELECT" : "initial SELECT";
-        // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) performing ${action}.`);
         const rows = await this.dbManager.runQuery(`SELECT id FROM ${tableName} WHERE ${entityNameColumn} = $1`, [entityName]);
         if (rows.length > 0) {
-            // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) found on ${action} with ID: ${rows[0].id}.`);
             return rows[0].id;
         }
-        // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) not found on ${action}.`);
         return null;
     }
 
     async _createEntity(tableName, entityNameColumn, entityName, logPrefix = 'Entity', lockKey = '') {
-        // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) attempting INSERT.`);
         const insertResult = await this.dbManager.runCommand(`INSERT INTO ${tableName} (${entityNameColumn}) VALUES ($1)`, [entityName]);
         if (insertResult && insertResult.id !== undefined) {
             console.log(`EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) created with ID: ${insertResult.id}`);
@@ -28,16 +24,12 @@ class EntityManager {
 
     async findOrCreateEntity(tableName, entityName, entityNameColumn = 'name', logPrefix = 'Entity') {
         if (!entityName || String(entityName).trim() === '') {
-            // Added a guard for empty entity names, as they can cause issues.
             console.warn(`EntityManager: Attempted to find or create an entity in table '${tableName}' with an empty name. Skipping.`);
-            // Consider whether to throw an error or return null/undefined.
-            // Returning null might be consistent with not finding an entity.
             return null;
         }
         const lockKey = `${tableName}-${entityNameColumn}-${entityName}`;
 
         if (this.entityCreationLocks.has(lockKey)) {
-            // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) operation already pending, awaiting existing promise.`);
             return this.entityCreationLocks.get(lockKey);
         }
 
@@ -47,9 +39,7 @@ class EntityManager {
             promiseRejector = reject;
         });
         this.entityCreationLocks.set(lockKey, newPromise);
-        // console.log(`DEBUG: EntityManager: ${logPrefix} '${entityName}' (key: ${lockKey}) - new promise lock SET.`);
 
-        // Extracted logic into _executeFindOrCreateLogic
         this._executeFindOrCreateLogic(
             newPromise, promiseResolver, promiseRejector,
             tableName, entityNameColumn, entityName,

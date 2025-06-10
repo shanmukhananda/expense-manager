@@ -1,19 +1,13 @@
-// src/controllers/app-controller.js
 
 import { ApiService } from '../services/api-service.js';
 import { UIManager } from '../views/ui.js';
 import { AnalyticsManager } from './analytics-controller.js';
 
-/**
- * Main application class to manage state and orchestrate interactions.
- * Adheres to the Facade pattern, providing a simplified interface to the
- * underlying API and UI managers.
- */
 class App {
     constructor() {
         this.api = new ApiService();
         this.ui = new UIManager();
-        this.activeTabId = null; // Initialize activeTabId
+        this.activeTabId = null;
         this.analyticsManager = new AnalyticsManager(
             this.ui,
             this.ui.elements.analyticsFiltersContainer,
@@ -28,20 +22,14 @@ class App {
         this.expenses = [];
 
         this._bindEventHandlers();
-        // onConnectToggle is bound in _bindEventHandlers now
-        this.ui.attachAddButtonListeners(); // Attach listeners after binding callbacks
+        this.ui.attachAddButtonListeners();
 
-        // Set initial UI state for DB connection
         this.ui.setConnectionStatus(false, 'Enter database URI and click Connect.');
     }
 
-    /**
-     * Binds UI event callbacks to App class methods.
-     * @private
-     */
     _bindEventHandlers() {
         this.ui.onTabChange = this._handleTabChange.bind(this);
-        this.ui.onConnectToggle = this.handleConnectToggle.bind(this); // Added
+        this.ui.onConnectToggle = this.handleConnectToggle.bind(this);
         this.ui.onAddGroup = this._handleAddGroup.bind(this);
         this.ui.onAddCategory = this._handleAddCategory.bind(this);
         this.ui.onAddPayer = this._handleAddPayer.bind(this);
@@ -57,27 +45,20 @@ class App {
      * Initializes the application by checking DB status and setting up the UI.
      */
     async init() {
-        // The main UI is initially disabled by UIManager.setConnectionStatus in constructor.
-        // We check the DB status and enable UI + load data if already connected.
         try {
             await this.checkInitialDbStatus();
         } catch (error) {
             console.error('Error during initial DB status check:', error);
-            // UIManager already shows "Enter database URI..."
-            // Optionally, show a more specific error if checkInitialDbStatus itself fails badly
             this.ui.showInfoModal('Initialization Check Error', `Could not verify database status: ${error.message}`);
         }
     }
 
     /**
      * Loads initial data if connected to the database.
-     * Renamed from _fetchAllData
      */
     async loadInitialData() {
         if (!this.dbConnected) {
             console.log('loadInitialData skipped: Not connected to DB.');
-            // UI should reflect that no data can be loaded / actions performed.
-            // uiManager._setMainUIEnabled(false) handles clearing lists.
             return;
         }
         console.log('loadInitialData: Connected, fetching data...');
@@ -98,23 +79,13 @@ class App {
         } catch (error) {
             console.error('Error fetching all data:', error);
             this.ui.showInfoModal('Data Fetch Error', `Failed to load data: ${error.message}`);
-            // Do not re-throw, allow app to continue in disconnected state if user retries
         }
     }
 
-    /**
-     * Handles tab changes, re-rendering the appropriate list.
-     * @private
-     * @param {string} tabId - The ID of the activated tab.
-     */
     async _handleTabChange(tabId) {
-        this.activeTabId = tabId; // Store active tab
+        this.activeTabId = tabId;
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', 'Please connect to the database to view data.');
-            // Ensure the previously active tab (if any) remains visually selected,
-            // or reset to a default non-data view if one exists.
-            // For now, UIManager._setMainUIEnabled(false) should have cleared content.
-            // If a tab was previously active, it will remain visually so.
             return;
         }
         this.ui.activateTab(tabId);
@@ -181,7 +152,6 @@ class App {
             !this.payers || this.payers.length === 0) {
             await this.loadInitialData();
         }
-        // Guard against analytics rendering if data is still not available or DB disconnected
         if (!this.dbConnected) return;
 
         this.analyticsManager.renderAnalyticsFilters({
@@ -195,7 +165,7 @@ class App {
             this._handleEditExpense.bind(this),
             this._handleDeleteExpense.bind(this)
         );
-        this.analyticsManager.renderAnalyticsResults(null); // Clear previous results
+            this.analyticsManager.renderAnalyticsResults(null);
     }
 
     async _handleApplyAnalyticsFilters() {
@@ -209,7 +179,6 @@ class App {
         }
     }
 
-    // --- Database Connection Management ---
     async _attemptDbDisconnect() {
         try {
             await this.api.disconnectDB();
@@ -220,11 +189,9 @@ class App {
             this.payers = [];
             this.paymentModes = [];
             this.expenses = [];
-            // UIManager._setMainUIEnabled(false) called by setConnectionStatus handles UI clearing.
         } catch (error) {
             console.error('Failed to disconnect from database:', error);
             this.ui.showInfoModal('Error', `Failed to disconnect from database: ${error.message}`);
-            // UI remains in connected state if disconnect failed, dbConnected remains true.
         }
     }
 
@@ -239,7 +206,6 @@ class App {
             this.dbConnected = true;
             this.ui.setConnectionStatus(true, 'Successfully connected to database.');
             await this.loadInitialData();
-            // Activate a default tab
             if (this.expenses && this.expenses.length > 0) {
                 this._handleTabChange('tab-expenses');
             } else {
@@ -265,13 +231,12 @@ class App {
         this.dbConnected = true;
         this.ui.setConnectionStatus(true, statusMessage || 'Connected to database.');
         await this.loadInitialData();
-        // Activate a default tab
         if (this.expenses && this.expenses.length > 0) {
             this._handleTabChange('tab-expenses');
         } else if (this.groups && this.groups.length > 0) {
             this._handleTabChange('tab-groups');
         } else {
-            this.ui.activateTab('tab-groups'); // Default if no data in preferred tabs
+            this.ui.activateTab('tab-groups');
         }
     }
 
@@ -294,7 +259,6 @@ class App {
         }
     }
 
-    // --- Render Methods ---
     _renderGroups() {
         if (!this.dbConnected) return;
         this.ui.renderEntityList(this.groups, this.ui.elements.groupsList, 'Expense Group',
@@ -321,11 +285,9 @@ class App {
 
     _renderExpenses() {
         if (!this.dbConnected) return;
-        // Update the call to this.ui.renderExpenses to match the new signature
         this.ui.renderExpenses(this.expenses, this.ui.elements.expensesList, this._handleEditExpense.bind(this), this._handleDeleteExpense.bind(this));
     }
 
-    // --- Generic CRUD Handlers ---
     async _handleAddEntity(apiCall, entityTypeName, successTab) {
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', `Please connect to the database to add a ${entityTypeName}.`);
@@ -333,7 +295,7 @@ class App {
         }
         try {
             await apiCall();
-            await this._handleTabChange(successTab); // This will re-fetch and re-render
+            await this._handleTabChange(successTab);
         } catch (error) {
             this.ui.showInfoModal('Add Error', `Failed to add ${entityTypeName}: ${error.message}`);
         }
@@ -346,7 +308,7 @@ class App {
         }
         try {
             await apiCall();
-            await this._handleTabChange(successTab); // This will re-fetch and re-render
+            await this._handleTabChange(successTab);
         } catch (error) {
             this.ui.showInfoModal('Rename Error', `Failed to rename ${entityTypeName}: ${error.message}`);
         }
@@ -359,14 +321,12 @@ class App {
         }
         try {
             await apiCall();
-            await this._handleTabChange(successTab); // This will re-fetch and re-render
+            await this._handleTabChange(successTab);
         } catch (error) {
             this.ui.showInfoModal('Delete Error', `Failed to delete ${entityTypeName}: ${error.message}`);
         }
     }
 
-
-    // --- Specific Add Handlers (delegating to generic) ---
     async _handleAddGroup(name) {
         await this._handleAddEntity(() => this.api.addGroup(name), 'group', 'tab-groups');
     }
@@ -384,7 +344,6 @@ class App {
     }
 
     async _handleAddExpense(expenseData) {
-        // Guard is in _handleAddEntity, but good to be explicit if params are involved before call
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', 'Please connect to the database to add an expense.');
             return;
@@ -392,7 +351,6 @@ class App {
         await this._handleAddEntity(() => this.api.addExpense(expenseData), 'expense', 'tab-expenses');
     }
 
-    // --- Specific Rename Handlers (delegating to generic) ---
     async _handleRenameGroup(id, newName) {
         await this._handleRenameEntity(() => this.api.updateGroup(id, newName), 'group', 'tab-groups');
     }
@@ -409,12 +367,11 @@ class App {
         await this._handleRenameEntity(() => this.api.updatePaymentMode(id, newName), 'payment mode', 'tab-payment-modes');
     }
 
-    // --- Specific Edit Expense Handler ---
     async _ensureMasterDataForEditing() {
         if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
             console.log('_ensureMasterDataForEditing: Master data missing, attempting to load.');
             await this.loadInitialData();
-            if (!this.dbConnected) return false; // Load failed or disconnected during load
+            if (!this.dbConnected) return false;
             if (!this.groups.length || !this.categories.length || !this.payers.length || !this.paymentModes.length) {
                 this.ui.showInfoModal('Data Missing', 'Could not load necessary master data for editing. Please try again.');
                 return false;
@@ -427,8 +384,8 @@ class App {
         if (this.activeTabId === 'tab-analytics') {
             await this._handleApplyAnalyticsFilters();
         } else {
-            await this.loadInitialData(); // Reloads expenses and master data
-            this._renderExpenses();      // Re-renders the main expense list
+            await this.loadInitialData();
+            this._renderExpenses();
         }
     }
 
@@ -461,7 +418,6 @@ class App {
         }, this._processExpenseUpdate.bind(this));
     }
 
-    // --- Specific Delete Handlers (delegating to generic for master data) ---
     async _handleDeleteGroup(id) {
         await this._handleDeleteEntity(() => this.api.deleteGroup(id), 'group', 'tab-groups');
     }
@@ -478,7 +434,6 @@ class App {
         await this._handleDeleteEntity(() => this.api.deletePaymentMode(id), 'payment mode', 'tab-payment-modes');
     }
 
-    // Make _handleDeleteExpense non-generic to handle specific refresh logic
     async _handleDeleteExpense(id) {
         if (!this.dbConnected) {
             this.ui.showInfoModal('Not Connected', 'Please connect to the database to delete an expense.');
@@ -509,7 +464,6 @@ class App {
         this.ui.displayImportExportStatus('Importing, please wait...');
         try {
             const fileContentsString = await file.text();
-            // Assuming this.api.importCsv will be added to ApiService
             const result = await this.api.importCsv(fileContentsString);
 
             let message = `Import complete. Total rows processed by server: ${result.totalRows || 'N/A'}. Successful: ${result.successfulInserts || 0}. Failed: ${result.failedInserts || 0}.`;
@@ -521,7 +475,7 @@ class App {
             }
 
             if (result.successfulInserts > 0) {
-                await this._refreshDataAfterChange(); // Refresh data as import was successful
+                await this._refreshDataAfterChange();
             }
         } catch (error) {
             console.error('Error during CSV import API call:', error);
@@ -539,8 +493,8 @@ class App {
 
         this.ui.displayImportExportStatus('Exporting, please wait...');
         try {
-            const filters = this.ui.getExportFilters(); // Get filters from UI
-            const csvDataString = await this.api.exportCsv(filters); // Pass filters to API
+            const filters = this.ui.getExportFilters();
+            const csvDataString = await this.api.exportCsv(filters);
             if (csvDataString && typeof csvDataString === 'string') {
                 this.ui.triggerCsvDownload(csvDataString, 'expenses_export.csv');
                 this.ui.displayImportExportStatus('Export successful! Download should start automatically.', false, true);
@@ -552,9 +506,8 @@ class App {
             this.ui.displayImportExportStatus(`Export API request failed: ${error.message}`, true);
         }
     }
-} // App class closing brace
+}
 
-// Initialize the application when the DOM is fully loaded
 window.addEventListener('DOMContentLoaded', () => {
     const app = new App();
     app.init();

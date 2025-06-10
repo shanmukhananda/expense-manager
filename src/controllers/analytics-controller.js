@@ -1,8 +1,6 @@
-// src/controllers/analytics-controller.js
 
 export class AnalyticsManager {
     /**
-     * Constructor for AnalyticsManager.
      * @param {UIManager} uiManager - Instance of UIManager for generic UI tasks (e.g., modals).
      * @param {HTMLElement} filtersContainer - The DOM element to host filter controls.
      * @param {HTMLElement} resultsContainer - The DOM element to display analytics results.
@@ -12,47 +10,30 @@ export class AnalyticsManager {
         this.filtersContainer = filtersContainer;
         this.resultsContainer = resultsContainer;
 
-        // These will store references to dynamically created/managed elements within the containers
         this.elements = {
             startDateInput: null,
             endDateInput: null,
             allTimeBtn: null,
-            categorySelect: null,
-            paymentModeSelect: null,
-            groupSelect: null, // Added
-            payerSelect: null,   // Added
+            categorySelect: null, // Will be null, kept for structure consistency if ever needed
+            paymentModeSelect: null, // Will be null
+            groupSelect: null, // Will be null
+            payerSelect: null,   // Will be null
             applyFiltersBtn: null,
         };
         this.onEditExpense = null;
         this.onDeleteExpense = null;
     }
 
-    /**
-     * Sets callback functions for handling expense edit and delete actions.
-     * These callbacks are typically provided by AppController and will be passed to UIManager.
-     * @param {Function|null} onEdit - Callback for editing an expense.
-     * @param {Function|null} onDelete - Callback for deleting an expense.
-     */
     setExpenseActionCallbacks(onEdit, onDelete) {
         this.onEditExpense = onEdit;
         this.onDeleteExpense = onDelete;
     }
 
-    /**
-     * Caches references to dynamically created filter input elements.
-     * This method will be called internally after filter HTML is rendered.
-     * @private
-     */
     _cacheFilterElements() {
         if (this.filtersContainer) {
             this.elements.startDateInput = this.filtersContainer.querySelector('#analytics-start-date');
             this.elements.endDateInput = this.filtersContainer.querySelector('#analytics-end-date');
             this.elements.allTimeBtn = this.filtersContainer.querySelector('#analytics-all-time-btn');
-            // Removed caching of select elements as they are replaced by checkbox groups
-            // this.elements.categorySelect = this.filtersContainer.querySelector('#analytics-category-select');
-            // this.elements.paymentModeSelect = this.filtersContainer.querySelector('#analytics-payment-mode-select');
-            // this.elements.groupSelect = this.filtersContainer.querySelector('#analytics-group-select');
-            // this.elements.payerSelect = this.filtersContainer.querySelector('#analytics-payer-select');
             this.elements.applyFiltersBtn = this.filtersContainer.querySelector('#analytics-apply-filters-btn');
         }
     }
@@ -149,7 +130,7 @@ export class AnalyticsManager {
     }
 
     renderAnalyticsFilters(masterData, applyFiltersCallback) {
-        this.filtersContainer.innerHTML = ''; // Clear previous filters
+        this.filtersContainer.innerHTML = '';
 
         const dateRangeHTML = this._renderDateRangeFilter();
         const categoryHTML = this._renderCategoryFilter(masterData.categories);
@@ -228,8 +209,8 @@ export class AnalyticsManager {
             endDate,
             categoryIds,
             paymentModeIds,
-            groupIds, // Added
-            payerIds    // Added
+            groupIds,
+            payerIds
         };
     }
 
@@ -245,7 +226,7 @@ export class AnalyticsManager {
 
     _renderCategoryBreakdownTable(categoryBreakdown) {
         if (!categoryBreakdown || categoryBreakdown.length === 0) {
-            return ''; // Or a message like "<p>No category breakdown available.</p>" if preferred
+            return '';
         }
 
         let tableRowsHTML = '';
@@ -283,18 +264,17 @@ export class AnalyticsManager {
 
     _renderFilteredExpensesSection(filteredExpenses) {
         if (!filteredExpenses || filteredExpenses.length === 0) {
-            return ''; // Or a message if preferred
+            return '';
         }
         return `
             <h4 class="text-lg font-semibold text-gray-800 mt-6 mb-2">Filtered Expense Details (${filteredExpenses.length})</h4>
             <div id="analytics-filtered-expenses-list" class="max-h-[32rem] overflow-y-auto border border-gray-200 rounded-lg shadow-inner p-1 bg-gray-50 space-y-3">
-                <!-- Expense items will be rendered here by UIManager -->
             </div>
         `;
     }
 
     renderAnalyticsResults(analyticsData) {
-        this.resultsContainer.innerHTML = ''; // Clear previous results
+        this.resultsContainer.innerHTML = '';
 
         if (!analyticsData) {
             this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">Analytics data is currently unavailable.</p>';
@@ -314,8 +294,6 @@ export class AnalyticsManager {
         let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount);
         resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
         
-        // Add a message if there's a total count, but no category breakdown AND no filtered expenses to list.
-        // This covers a specific edge case.
         if (totalFilteredCount > 0 &&
             (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
             (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
@@ -326,7 +304,6 @@ export class AnalyticsManager {
 
         this.resultsContainer.innerHTML = resultsHTML;
 
-        // Populate filtered expenses list
         if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
             const expenseListContainer = this.resultsContainer.querySelector('#analytics-filtered-expenses-list');
             if (expenseListContainer && this.uiManager && typeof this.uiManager.renderExpenses === 'function') {
