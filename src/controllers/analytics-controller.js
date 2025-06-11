@@ -68,6 +68,10 @@ export class AnalyticsManager {
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Categories</h4>
+                <div class="flex justify-between text-xs mb-1">
+                    <button type="button" class="text-blue-500 hover:text-blue-700 select-all-btn" data-filter-type="analytics-category-filter">Select All</button>
+                    <button type="button" class="text-blue-500 hover:text-blue-700 deselect-all-btn" data-filter-type="analytics-category-filter">Deselect All</button>
+                </div>
                 <div id="analytics-category-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
                     ${categoryCheckboxes}
                 </div>
@@ -86,6 +90,10 @@ export class AnalyticsManager {
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payment Modes</h4>
+                <div class="flex justify-between text-xs mb-1">
+                    <button type="button" class="text-blue-500 hover:text-blue-700 select-all-btn" data-filter-type="analytics-payment-mode-filter">Select All</button>
+                    <button type="button" class="text-blue-500 hover:text-blue-700 deselect-all-btn" data-filter-type="analytics-payment-mode-filter">Deselect All</button>
+                </div>
                 <div id="analytics-payment-mode-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
                     ${paymentModeCheckboxes}
                 </div>
@@ -104,6 +112,10 @@ export class AnalyticsManager {
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Expense Groups</h4>
+                <div class="flex justify-between text-xs mb-1">
+                    <button type="button" class="text-blue-500 hover:text-blue-700 select-all-btn" data-filter-type="analytics-group-filter">Select All</button>
+                    <button type="button" class="text-blue-500 hover:text-blue-700 deselect-all-btn" data-filter-type="analytics-group-filter">Deselect All</button>
+                </div>
                 <div id="analytics-group-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
                     ${groupCheckboxes}
                 </div>
@@ -122,6 +134,10 @@ export class AnalyticsManager {
         return `
             <div class="bg-white p-4 rounded-lg shadow">
                 <h4 class="text-md font-semibold text-gray-700 mb-3">Payers</h4>
+                <div class="flex justify-between text-xs mb-1">
+                    <button type="button" class="text-blue-500 hover:text-blue-700 select-all-btn" data-filter-type="analytics-payer-filter">Select All</button>
+                    <button type="button" class="text-blue-500 hover:text-blue-700 deselect-all-btn" data-filter-type="analytics-payer-filter">Deselect All</button>
+                </div>
                 <div id="analytics-payer-filter-container" class="mt-1 space-y-2 h-32 overflow-y-auto">
                     ${payerCheckboxes}
                 </div>
@@ -153,6 +169,41 @@ export class AnalyticsManager {
 
         this.filtersContainer.innerHTML = filtersHTML;
         this._cacheFilterElements();
+
+        // Add event listeners for Select All / Deselect All buttons
+        const selectAllButtons = this.filtersContainer.querySelectorAll('.select-all-btn');
+        selectAllButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const filterType = button.dataset.filterType;
+                if (filterType) {
+                    const parentSection = button.closest('.bg-white.p-4.rounded-lg.shadow');
+                    if (parentSection) {
+                        const checkboxes = parentSection.querySelectorAll(`input[name="${filterType}"]`);
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = true;
+                        });
+                    }
+                }
+            });
+        });
+
+        const deselectAllButtons = this.filtersContainer.querySelectorAll('.deselect-all-btn');
+        deselectAllButtons.forEach(button => {
+            button.addEventListener('click', (event) => {
+                event.preventDefault();
+                const filterType = button.dataset.filterType;
+                if (filterType) {
+                    const parentSection = button.closest('.bg-white.p-4.rounded-lg.shadow');
+                    if (parentSection) {
+                        const checkboxes = parentSection.querySelectorAll(`input[name="${filterType}"]`);
+                        checkboxes.forEach(checkbox => {
+                            checkbox.checked = false;
+                        });
+                    }
+                }
+            });
+        });
 
         if (this.elements.endDateInput && this.elements.startDateInput) {
             const today = new Date();
@@ -214,11 +265,12 @@ export class AnalyticsManager {
         };
     }
 
-    _renderSummarySection(overallTotal, totalFilteredCount) {
+    _renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds) {
         return `
             <div class="mb-6 p-4 bg-white shadow rounded-lg">
                 <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
                 <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total After Refunds: <span class="font-bold text-blue-600">${totalAfterRefunds.toFixed(2)}</span></p>
                 <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
             </div>
         `;
@@ -283,6 +335,7 @@ export class AnalyticsManager {
 
         const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
         const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
+        const totalAfterRefunds = parseFloat(analyticsData.totalAfterRefunds) || 0; // Add this line
 
         if (totalFilteredCount === 0 &&
             (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
@@ -291,7 +344,7 @@ export class AnalyticsManager {
             return;
         }
 
-        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount);
+        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds); // Pass totalAfterRefunds
         resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
         
         if (totalFilteredCount > 0 &&
