@@ -4,7 +4,7 @@
   "description": "This is a full-stack web application designed to help you track and manage your personal expenses. It features a user-friendly interface for recording daily spending and organizing financial data.",
   "main": "server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "test": "jest",
     "start": "node server.js",
     "import-csv": "node import_csv.js"
   },
@@ -17,5 +17,12 @@
     "express": "^5.1.0",
     "pg": "^8.16.0",
     "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@babel/core": "^7.27.4",
+    "@babel/preset-env": "^7.27.2",
+    "babel-jest": "^30.0.0",
+    "jest": "^30.0.0",
+    "jest-environment-jsdom": "^30.0.0"
   }
 }

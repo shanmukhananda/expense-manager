@@ -156,6 +156,7 @@ class ExpenseRepository {
 
     _aggregateAnalyticsData(rows) {
         let overallTotal = 0;
+        let totalAfterRefunds = 0; // Initialize totalAfterRefunds
         const categoryTotals = {};
         const categoryBreakdown = [];
 
@@ -163,13 +164,20 @@ class ExpenseRepository {
             return {
                 overallTotal: 0,
                 totalFilteredCount: 0,
-                categoryBreakdown: []
+                categoryBreakdown: [],
+                totalAfterRefunds: 0 // Ensure totalAfterRefunds is returned even if rows is empty
             };
         }
 
         const totalFilteredCount = rows.length;
         rows.forEach(row => {
             overallTotal += row.amount;
+            // Calculate totalAfterRefunds
+            if (row.category_name === "Refund") {
+                totalAfterRefunds -= row.amount;
+            } else {
+                totalAfterRefunds += row.amount;
+            }
             const categoryId = row.expense_category_id;
             categoryTotals[categoryId] = (categoryTotals[categoryId] || 0) + row.amount;
         });
@@ -191,7 +199,8 @@ class ExpenseRepository {
         return {
             overallTotal: parseFloat(overallTotal.toFixed(2)),
             totalFilteredCount,
-            categoryBreakdown
+            categoryBreakdown,
+            totalAfterRefunds: parseFloat(totalAfterRefunds.toFixed(2)) // Add totalAfterRefunds to the return
         };
     }
 

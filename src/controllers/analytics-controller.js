@@ -214,11 +214,12 @@ export class AnalyticsManager {
         };
     }
 
-    _renderSummarySection(overallTotal, totalFilteredCount) {
+    _renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds) {
         return `
             <div class="mb-6 p-4 bg-white shadow rounded-lg">
                 <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
                 <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total After Refunds: <span class="font-bold text-blue-600">${totalAfterRefunds.toFixed(2)}</span></p>
                 <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
             </div>
         `;
@@ -283,6 +284,7 @@ export class AnalyticsManager {
 
         const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
         const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
+        const totalAfterRefunds = parseFloat(analyticsData.totalAfterRefunds) || 0; // Add this line
 
         if (totalFilteredCount === 0 &&
             (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
@@ -291,7 +293,7 @@ export class AnalyticsManager {
             return;
         }
 
-        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount);
+        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds); // Pass totalAfterRefunds
         resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
         
         if (totalFilteredCount > 0 &&
