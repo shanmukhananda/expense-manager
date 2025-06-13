@@ -1,5 +1,5 @@
 // EntityListView.js
-class EntityListView {
+export class EntityListView {
     /**
      * Manages UI for entities (Groups, Categories, Payers, Payment Modes).
      * @param {Object} elements - DOM elements for entity management.
@@ -153,4 +153,4 @@ class EntityListView {
     }
 }
 
-module.exports = EntityListView;
+// No explicit export statement needed here as the class is exported directly

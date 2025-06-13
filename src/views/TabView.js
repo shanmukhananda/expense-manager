@@ -1,5 +1,5 @@
 // TabView.js
-class TabView {
+export class TabView {
     /**
      * Manages tab switching behavior.
      * @param {Object} elements - Object containing DOM elements for tabs.
@@ -48,4 +48,4 @@ class TabView {
     }
 }
 
-module.exports = TabView;
+// No explicit export statement needed here as the class is exported directly

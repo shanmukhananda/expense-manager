@@ -1,5 +1,5 @@
 // ModalView.js
-class ModalView {
+export class ModalView {
     /**
      * Manages all modal dialog interactions.
      * @param {Object} elements - Object containing DOM elements for modals.
@@ -194,4 +194,4 @@ class ModalView {
     }
 }
 
-module.exports = ModalView;
+// No explicit export statement needed here as the class is exported directly

@@ -1,13 +1,13 @@
 // src/views/ui.js
 
-const TabView = require('./TabView');
-const ModalView = require('./ModalView');
-const EntityListView = require('./EntityListView');
-const ExpenseView = require('./ExpenseView');
-const CsvView = require('./CsvView');
-const DbConnectionView = require('./DbConnectionView');
+import { TabView } from './TabView.js';
+import { ModalView } from './ModalView.js';
+import { EntityListView } from './EntityListView.js';
+import { ExpenseView } from './ExpenseView.js';
+import { CsvView } from './CsvView.js';
+import { DbConnectionView } from './DbConnectionView.js';
 
-class UIManager {
+export class UIManager {
     constructor() {
         this.elements = this._cacheDOMElements();
         this._initializeSubManagers();
@@ -282,4 +282,4 @@ class UIManager {
     showInfoModal(title, message) { this.modalView.showInfoModal(title, message); }
 }
 
-module.exports = { UIManager };
+// No explicit module.exports needed due to 'export class UIManager'

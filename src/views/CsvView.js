@@ -1,5 +1,5 @@
 // CsvView.js
-class CsvView {
+export class CsvView {
     /**
      * Manages UI for CSV import and export.
      * @param {Object} elements - DOM elements for CSV operations.
@@ -183,4 +183,4 @@ class CsvView {
     }
 }
 
-module.exports = CsvView;
+// No explicit export statement needed here as the class is exported directly

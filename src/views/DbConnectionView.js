@@ -1,5 +1,5 @@
 // DbConnectionView.js
-class DbConnectionView {
+export class DbConnectionView {
     /**
      * Manages UI for database connection.
      * @param {Object} elements - DOM elements for DB connection.
@@ -160,4 +160,4 @@ class DbConnectionView {
     }
 }
 
-module.exports = DbConnectionView;
+// No explicit export statement needed here as the class is exported directly

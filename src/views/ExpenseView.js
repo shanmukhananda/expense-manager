@@ -1,5 +1,5 @@
 // ExpenseView.js
-class ExpenseView {
+export class ExpenseView {
     /**
      * Manages UI for expenses.
      * @param {Object} elements - DOM elements for expense management.
@@ -220,4 +220,4 @@ class ExpenseView {
     }
 }
 
-module.exports = ExpenseView;
+// No explicit export statement needed here as the class is exported directly
