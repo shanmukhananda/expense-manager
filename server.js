@@ -21,7 +21,7 @@ async function main() {
 
     // Then Middleware setup
     const bodyParser = require('body-parser'); 
-    app.use(bodyParser.json());
+    app.use(bodyParser.json({ limit: '50mb' }));
     app.use(express.static(path.join(__dirname, 'src'))); 
 
     // Initialize and use routes from the controller FIRST
