@@ -21,24 +21,41 @@ class App {
         this.paymentModes = [];
         this.expenses = [];
 
-        this._bindEventHandlers();
-        this.ui.attachAddButtonListeners();
+        this._setupUICallbacks();
+        // this.ui.attachAddButtonListeners(); // Obsolete: Handled by sub-managers
 
         this.ui.setConnectionStatus(false, 'Enter database URI and click Connect.');
     }
 
-    _bindEventHandlers() {
-        this.ui.onTabChange = this._handleTabChange.bind(this);
-        this.ui.onConnectToggle = this.handleConnectToggle.bind(this);
-        this.ui.onAddGroup = this._handleAddGroup.bind(this);
-        this.ui.onAddCategory = this._handleAddCategory.bind(this);
-        this.ui.onAddPayer = this._handleAddPayer.bind(this);
-        this.ui.onAddPaymentMode = this._handleAddPaymentMode.bind(this);
-        this.ui.onAddExpense = this._handleAddExpense.bind(this);
-        this.ui.onEditExpense = this._handleEditExpense.bind(this);
+    _setupUICallbacks() {
+        this.ui.setAppCallbacks({
+            // General UI Actions
+            onTabSwitched: this._handleTabChange.bind(this),
+            onConnectToggle: this.handleConnectToggle.bind(this),
 
-        this.ui.onImportCsv = this._handleImportCsv.bind(this);
-        this.ui.onExportCsv = this._handleExportCsv.bind(this);
+            // Entity Actions
+            onAddGroup: this._handleAddGroup.bind(this),
+            onRenameGroup: this._handleRenameGroup.bind(this),
+            onDeleteGroup: this._handleDeleteGroup.bind(this),
+            onAddCategory: this._handleAddCategory.bind(this),
+            onRenameCategory: this._handleRenameCategory.bind(this),
+            onDeleteCategory: this._handleDeleteCategory.bind(this),
+            onAddPayer: this._handleAddPayer.bind(this),
+            onRenamePayer: this._handleRenamePayer.bind(this),
+            onDeletePayer: this._handleDeletePayer.bind(this),
+            onAddPaymentMode: this._handleAddPaymentMode.bind(this),
+            onRenamePaymentMode: this._handleRenamePaymentMode.bind(this),
+            onDeletePaymentMode: this._handleDeletePaymentMode.bind(this),
+
+            // Expense Actions
+            onAddExpense: this._handleAddExpense.bind(this),
+            onEditExpense: this._handleEditExpense.bind(this), // This is the entry point from ExpenseUIManager
+            onDeleteExpense: this._handleDeleteExpense.bind(this),
+
+            // CSV Actions
+            onImportCsv: this._handleImportCsv.bind(this),
+            onExportCsv: this._handleExportCsv.bind(this)
+        });
     }
 
     /**
@@ -196,7 +213,7 @@ class App {
     }
 
     async _attemptDbConnect() {
-        const connectionString = this.ui.getDatabasePath();
+        const connectionString = this.ui.getDatabaseConnectionString(); // Corrected method name
         if (!connectionString) {
             this.ui.showInfoModal('Input Required', 'Please enter a database connection string.');
             return;
@@ -261,31 +278,27 @@ class App {
 
     _renderGroups() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.groups, this.ui.elements.groupsList, 'Expense Group',
-            this._handleRenameGroup.bind(this), this._handleDeleteGroup.bind(this));
+        this.ui.renderGroups(this.groups);
     }
 
     _renderCategories() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.categories, this.ui.elements.categoriesList, 'Expense Category',
-            this._handleRenameCategory.bind(this), this._handleDeleteCategory.bind(this));
+        this.ui.renderCategories(this.categories);
     }
 
     _renderPayers() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.payers, this.ui.elements.payersList, 'Payer',
-            this._handleRenamePayer.bind(this), this._handleDeletePayer.bind(this));
+        this.ui.renderPayers(this.payers);
     }
 
     _renderPaymentModes() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.paymentModes, this.ui.elements.paymentModesList, 'Payment Mode',
-            this._handleRenamePaymentMode.bind(this), this._handleDeletePaymentMode.bind(this));
+        this.ui.renderPaymentModes(this.paymentModes);
     }
 
     _renderExpenses() {
         if (!this.dbConnected) return;
-        this.ui.renderExpenses(this.expenses, this.ui.elements.expensesList, this._handleEditExpense.bind(this), this._handleDeleteExpense.bind(this));
+        this.ui.renderExpenses(this.expenses);
     }
 
     async _handleAddEntity(apiCall, entityTypeName, successTab) {
@@ -410,12 +423,28 @@ class App {
         const masterDataAvailable = await this._ensureMasterDataForEditing();
         if (!masterDataAvailable) return;
 
-        this.ui.showEditExpenseModal(expenseToEdit, {
-            groups: this.groups,
-            categories: this.categories,
-            payers: this.payers,
-            paymentModes: this.paymentModes
-        }, this._processExpenseUpdate.bind(this));
+        // App._handleEditExpense is called by ExpenseUIManager when an item's edit button is clicked.
+        // This function then orchestrates showing the modal and providing the save callback.
+        this.ui.modalView.showEditExpenseModal( // Changed ui.modalManager to ui.modalView
+            expenseToEdit,
+            { // Master data for dropdowns in the modal
+                groups: this.groups,
+                categories: this.categories,
+                payers: this.payers,
+                paymentModes: this.paymentModes
+            },
+            // This is the "onSave" callback for the modal.
+            // It's called by ModalManager when its save button is clicked.
+            // It receives no arguments because ModalView's onSave is parameter-less;
+            // data should be fetched from the modal form elements.
+            async () => {
+                const updatedExpenseData = this.ui.modalView.getEditExpenseFormData(); // Changed ui.modalManager to ui.modalView
+                // Validation should ideally happen here or be re-triggered if complex,
+                // though basic validation might be in ModalView or ExpenseView.
+                // For now, assume _processExpenseUpdate handles what's needed.
+                await this._processExpenseUpdate(updatedExpenseData);
+            }
+        );
     }
 
     async _handleDeleteGroup(id) {

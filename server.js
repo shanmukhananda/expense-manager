@@ -5,11 +5,7 @@ const readline = require('readline');
 const DatabaseManager = require('./src/models/database');
 const ExpenseManagerServerController = require('./src/controllers/main-controller');
 
-// Removed promptForDbDetails function
-
 async function main() {
-    // Removed connectionString prompt
-
     const SCHEMA_PATH = path.resolve(__dirname, 'src', 'models', 'schema.sql');
     // Initialize DatabaseManager with null connection string
     const dbManager = new DatabaseManager(null, SCHEMA_PATH);
@@ -43,7 +39,6 @@ async function main() {
         console.log(`Server running on http://localhost:${PORT}`);
         console.log('Database will be initialized and connected via API endpoints.');
     });
-    // Removed try-catch block that previously handled dbManager.initialize() failure at startup
 }
 
 main();
