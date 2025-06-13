@@ -278,31 +278,27 @@ class App {
 
     _renderGroups() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.groups, this.ui.elements.groupsList, 'Expense Group',
-            this._handleRenameGroup.bind(this), this._handleDeleteGroup.bind(this));
+        this.ui.renderGroups(this.groups);
     }
 
     _renderCategories() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.categories, this.ui.elements.categoriesList, 'Expense Category',
-            this._handleRenameCategory.bind(this), this._handleDeleteCategory.bind(this));
+        this.ui.renderCategories(this.categories);
     }
 
     _renderPayers() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.payers, this.ui.elements.payersList, 'Payer',
-            this._handleRenamePayer.bind(this), this._handleDeletePayer.bind(this));
+        this.ui.renderPayers(this.payers);
     }
 
     _renderPaymentModes() {
         if (!this.dbConnected) return;
-        this.ui.renderEntityList(this.paymentModes, this.ui.elements.paymentModesList, 'Payment Mode',
-            this._handleRenamePaymentMode.bind(this), this._handleDeletePaymentMode.bind(this));
+        this.ui.renderPaymentModes(this.paymentModes);
     }
 
     _renderExpenses() {
         if (!this.dbConnected) return;
-        this.ui.renderExpenses(this.expenses, this.ui.elements.expensesList, this._handleEditExpense.bind(this), this._handleDeleteExpense.bind(this));
+        this.ui.renderExpenses(this.expenses);
     }
 
     async _handleAddEntity(apiCall, entityTypeName, successTab) {
