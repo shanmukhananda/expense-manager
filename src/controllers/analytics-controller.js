@@ -314,13 +314,13 @@ export class AnalyticsManager {
         return paginationHTML;
     }
 
-    _renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds) {
+    _renderSummarySection(grandTotalAmount, totalAllFilteredItems, grandTotalNetFigure) {
         return `
             <div class="mb-6 p-4 bg-white shadow rounded-lg">
                 <h4 class="text-lg font-semibold text-gray-800 mb-2">Summary</h4>
-                <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${overallTotal.toFixed(2)}</span></p>
-                <p class="text-gray-700">Total After Refunds: <span class="font-bold text-blue-600">${totalAfterRefunds.toFixed(2)}</span></p>
-                <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalFilteredCount}</span></p>
+                <p class="text-gray-700">Total Expenses (Filtered): <span class="font-bold text-blue-600">${grandTotalAmount.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total After Refunds: <span class="font-bold text-blue-600">${grandTotalNetFigure.toFixed(2)}</span></p>
+                <p class="text-gray-700">Total Transactions: <span class="font-bold text-blue-600">${totalAllFilteredItems}</span></p>
             </div>
         `;
     }
@@ -382,27 +382,33 @@ export class AnalyticsManager {
             return;
         }
 
-        const overallTotal = parseFloat(analyticsData.overallTotal) || 0;
-        const totalFilteredCount = parseInt(analyticsData.totalFilteredCount) || 0;
-        const totalAfterRefunds = parseFloat(analyticsData.totalAfterRefunds) || 0; // Add this line
+        // Use grand totals for the summary section
+        const grandTotalAmount = parseFloat(analyticsData.grandTotalAmount) || 0;
+        const totalAllFilteredItems = parseInt(analyticsData.totalAllFilteredItems) || 0;
+        const grandTotalNetFigure = parseFloat(analyticsData.grandTotalNetFigure) || 0;
 
-        if (totalFilteredCount === 0 &&
-            (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
-            (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
+        // Check if there are any items to display based on grand total count
+        if (totalAllFilteredItems === 0) {
             this.resultsContainer.innerHTML = '<p class="text-gray-500 text-center py-4">No expenses match the selected filters.</p>';
             return;
         }
 
-        let resultsHTML = this._renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds); // Pass totalAfterRefunds
-        resultsHTML += this._renderCategoryBreakdownTable(analyticsData.categoryBreakdown);
+        let resultsHTML = this._renderSummarySection(grandTotalAmount, totalAllFilteredItems, grandTotalNetFigure);
         
-        if (totalFilteredCount > 0 &&
-            (!analyticsData.categoryBreakdown || analyticsData.categoryBreakdown.length === 0) &&
-            (!analyticsData.filteredExpenses || analyticsData.filteredExpenses.length === 0)) {
-            resultsHTML += '<p class="text-gray-500 text-center py-4 mt-4">No detailed data (category or individual expenses) to display for the selection.</p>';
+        // Category breakdown and filtered expenses list are based on page-specific data.
+        // The analyticsData also contains pageOverallTotal and pageTotalFilteredCount for the current page's items.
+        const categoryBreakdown = analyticsData.categoryBreakdown || [];
+        const filteredExpenses = analyticsData.filteredExpenses || [];
+
+        resultsHTML += this._renderCategoryBreakdownTable(categoryBreakdown);
+
+        // This condition checks if there are overall items, but no specific breakdown or expense list for the current page/filters.
+        // This might occur if filters are very restrictive or if it's an empty page in pagination with prior pages having data.
+        if (totalAllFilteredItems > 0 && categoryBreakdown.length === 0 && filteredExpenses.length === 0) {
+            resultsHTML += '<p class="text-gray-500 text-center py-4 mt-4">No detailed data (category breakdown or individual expenses) for this specific selection or page.</p>';
         }
 
-        resultsHTML += this._renderFilteredExpensesSection(analyticsData.filteredExpenses);
+        resultsHTML += this._renderFilteredExpensesSection(filteredExpenses);
         resultsHTML += this._renderPaginationControls(analyticsData.totalAllFilteredItems || 0, this.pageSize, this.currentPage);
 
         this.resultsContainer.innerHTML = resultsHTML;

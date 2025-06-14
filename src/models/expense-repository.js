@@ -152,20 +152,30 @@ class ExpenseRepository {
         addIdFilter(filters.groupIds, 'e.expense_group_id');
         addIdFilter(filters.payerIds, 'e.payer_id');
 
-        const countParams = [...dataParams]; // Params for count query are before limit/offset
-        let countSql = `SELECT COUNT(*) as total ${baseSql}`;
+        // countParams are no longer needed, summaryParams will be used.
+
+        let summarySql = `
+            SELECT
+                SUM(e.amount) as totalAmount,
+                COUNT(*) as totalCount,
+                SUM(CASE WHEN ec.name = 'Refund' THEN -e.amount ELSE e.amount END) as totalNetFigure
+            ${baseSql}
+        `;
+        const summaryParams = [...dataParams]; // Create summaryParams from dataParams before limit/offset
 
         if (whereClauses.length > 0) {
             const whereString = ' WHERE ' + whereClauses.join(' AND ');
             dataSql += whereString;
-            countSql += whereString;
+            // countSql removed
+            summarySql += whereString;
         }
 
         dataSql += ` ORDER BY e.date DESC`;
+        dataSql += ` -- cache_buster_offset=${offset}\n`; // Cache busting comment
         dataSql += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
         dataParams.push(Number(limit), Number(offset));
 
-        return { dataSql, dataParams, countSql, countParams };
+        return { dataSql, dataParams, summarySql, summaryParams }; // countSql and countParams removed
     }
 
     _aggregateAnalyticsData(rows) {
@@ -219,18 +229,25 @@ class ExpenseRepository {
     }
 
     async getAnalyticsData(filters = {}) {
-        const { dataSql, dataParams, countSql, countParams } = this._buildAnalyticsQuery(filters);
+        const { dataSql, dataParams, summarySql, summaryParams } = this._buildAnalyticsQuery(filters);
 
-        const countResult = await this.dbManager.runQuery(countSql, countParams);
-        const totalAllFilteredItems = countResult.length > 0 ? parseInt(countResult[0].total) : 0;
+        const summaryResult = await this.dbManager.runQuery(summarySql, summaryParams);
+
+        const grandTotalAmount = summaryResult.length > 0 ? parseFloat(summaryResult[0].totalAmount) || 0 : 0;
+        const totalAllFilteredItems = summaryResult.length > 0 ? parseInt(summaryResult[0].totalCount) || 0 : 0;
+        const grandTotalNetFigure = summaryResult.length > 0 ? parseFloat(summaryResult[0].totalNetFigure) || 0 : 0;
 
         const rows = await this.dbManager.runQuery(dataSql, dataParams);
-        const aggregatedData = this._aggregateAnalyticsData(rows);
+        const pageAggregatedData = this._aggregateAnalyticsData(rows);
 
         return {
-            ...aggregatedData,
+            grandTotalAmount,
+            grandTotalNetFigure,
+            totalAllFilteredItems,
             filteredExpenses: rows,
-            totalAllFilteredItems
+            categoryBreakdown: pageAggregatedData.categoryBreakdown,
+            pageOverallTotal: pageAggregatedData.overallTotal,
+            pageTotalFilteredCount: pageAggregatedData.totalFilteredCount
         };
     }
 }
