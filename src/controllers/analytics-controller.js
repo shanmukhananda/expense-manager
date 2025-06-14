@@ -9,6 +9,8 @@ export class AnalyticsManager {
         this.uiManager = uiManager; // For modals or other shared UI functions
         this.filtersContainer = filtersContainer;
         this.resultsContainer = resultsContainer;
+        this.currentPage = 1;
+        this.pageSize = 50;
 
         this.elements = {
             startDateInput: null,
@@ -146,6 +148,7 @@ export class AnalyticsManager {
     }
 
     renderAnalyticsFilters(masterData, applyFiltersCallback) {
+        this.applyFiltersCallback = applyFiltersCallback; // Store the callback
         this.filtersContainer.innerHTML = '';
 
         const dateRangeHTML = this._renderDateRangeFilter();
@@ -213,7 +216,12 @@ export class AnalyticsManager {
         }
 
         if (this.elements.applyFiltersBtn) {
-             this.elements.applyFiltersBtn.addEventListener('click', applyFiltersCallback);
+             this.elements.applyFiltersBtn.addEventListener('click', () => {
+                this.currentPage = 1;
+                if (this.applyFiltersCallback) {
+                    this.applyFiltersCallback();
+                }
+            });
         }
         if (this.elements.allTimeBtn) {
             this.elements.allTimeBtn.addEventListener('click', () => {
@@ -261,8 +269,49 @@ export class AnalyticsManager {
             categoryIds,
             paymentModeIds,
             groupIds,
-            payerIds
+            payerIds,
+            limit: this.pageSize,
+            offset: (this.currentPage - 1) * this.pageSize
         };
+    }
+
+    _renderPaginationControls(totalItems, pageSize, currentPage) {
+        const totalPages = Math.ceil(totalItems / pageSize);
+        if (totalPages <= 1) {
+            return '';
+        }
+
+        let paginationHTML = '<div id="analytics-pagination-controls" class="flex justify-center items-center space-x-4 my-4">';
+
+        // Previous Button
+        const prevDisabled = currentPage === 1;
+        paginationHTML += `
+            <button
+                class="analytics-page-btn px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-md ${prevDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}"
+                data-page="${currentPage - 1}"
+                ${prevDisabled ? 'disabled' : ''}
+            >
+                Previous
+            </button>
+        `;
+
+        // Page X of Y
+        paginationHTML += `<span class="text-sm text-gray-700">Page ${currentPage} of ${totalPages}</span>`;
+
+        // Next Button
+        const nextDisabled = currentPage === totalPages;
+        paginationHTML += `
+            <button
+                class="analytics-page-btn px-4 py-2 text-sm font-medium text-white bg-blue-500 rounded-md ${nextDisabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-blue-600'}"
+                data-page="${currentPage + 1}"
+                ${nextDisabled ? 'disabled' : ''}
+            >
+                Next
+            </button>
+        `;
+
+        paginationHTML += '</div>';
+        return paginationHTML;
     }
 
     _renderSummarySection(overallTotal, totalFilteredCount, totalAfterRefunds) {
@@ -354,8 +403,23 @@ export class AnalyticsManager {
         }
 
         resultsHTML += this._renderFilteredExpensesSection(analyticsData.filteredExpenses);
+        resultsHTML += this._renderPaginationControls(analyticsData.totalAllFilteredItems || 0, this.pageSize, this.currentPage);
 
         this.resultsContainer.innerHTML = resultsHTML;
+
+        // Add event listeners for pagination buttons
+        const pageButtons = this.resultsContainer.querySelectorAll('.analytics-page-btn');
+        pageButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const targetPage = parseInt(button.dataset.page);
+                if (!isNaN(targetPage) && targetPage > 0) {
+                    this.currentPage = targetPage;
+                    if (this.applyFiltersCallback) {
+                        this.applyFiltersCallback();
+                    }
+                }
+            });
+        });
 
         if (analyticsData.filteredExpenses && analyticsData.filteredExpenses.length > 0) {
             const expenseListContainer = this.resultsContainer.querySelector('#analytics-filtered-expenses-list');

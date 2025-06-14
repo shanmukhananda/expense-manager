@@ -95,7 +95,16 @@ class ExpenseRepository {
     }
 
     _buildAnalyticsQuery(filters = {}) {
-        let sql = `
+        const { limit = 50, offset = 0 } = filters;
+        let baseSql = `
+            FROM expenses e
+            JOIN expense_groups eg ON e.expense_group_id = eg.id
+            JOIN expense_categories ec ON e.expense_category_id = ec.id
+            JOIN payers p ON e.payer_id = p.id
+            JOIN payment_mode pm ON e.payment_mode_id = pm.id
+        `;
+
+        let dataSql = `
             SELECT
                 e.id,
                 e.date,
@@ -109,14 +118,10 @@ class ExpenseRepository {
                 e.expense_category_id,
                 e.payer_id,
                 e.payment_mode_id
-            FROM expenses e
-            JOIN expense_groups eg ON e.expense_group_id = eg.id
-            JOIN expense_categories ec ON e.expense_category_id = ec.id
-            JOIN payers p ON e.payer_id = p.id
-            JOIN payment_mode pm ON e.payment_mode_id = pm.id
+            ${baseSql}
         `;
 
-        const params = [];
+        const dataParams = [];
         const whereClauses = [];
         let paramIndex = 1;
 
@@ -127,19 +132,19 @@ class ExpenseRepository {
             }
             if (Array.isArray(ids) && ids.length > 0) {
                 whereClauses.push(`${columnName} IN (${ids.map(() => `$${paramIndex++}`).join(',')})`);
-                params.push(...ids);
+                dataParams.push(...ids);
             }
         };
 
         if (filters.startDate && filters.endDate) {
             whereClauses.push(`e.date BETWEEN $${paramIndex++} AND $${paramIndex++}`);
-            params.push(filters.startDate, filters.endDate);
+            dataParams.push(filters.startDate, filters.endDate);
         } else if (filters.startDate) {
             whereClauses.push(`e.date >= $${paramIndex++}`);
-            params.push(filters.startDate);
+            dataParams.push(filters.startDate);
         } else if (filters.endDate) {
             whereClauses.push(`e.date <= $${paramIndex++}`);
-            params.push(filters.endDate);
+            dataParams.push(filters.endDate);
         }
 
         addIdFilter(filters.categoryIds, 'e.expense_category_id');
@@ -147,11 +152,20 @@ class ExpenseRepository {
         addIdFilter(filters.groupIds, 'e.expense_group_id');
         addIdFilter(filters.payerIds, 'e.payer_id');
 
+        const countParams = [...dataParams]; // Params for count query are before limit/offset
+        let countSql = `SELECT COUNT(*) as total ${baseSql}`;
+
         if (whereClauses.length > 0) {
-            sql += ' WHERE ' + whereClauses.join(' AND ');
+            const whereString = ' WHERE ' + whereClauses.join(' AND ');
+            dataSql += whereString;
+            countSql += whereString;
         }
-        sql += ` ORDER BY e.date DESC`;
-        return { sql, params };
+
+        dataSql += ` ORDER BY e.date DESC`;
+        dataSql += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
+        dataParams.push(limit, offset);
+
+        return { dataSql, dataParams, countSql, countParams };
     }
 
     _aggregateAnalyticsData(rows) {
@@ -205,14 +219,18 @@ class ExpenseRepository {
     }
 
     async getAnalyticsData(filters = {}) {
-        const { sql, params } = this._buildAnalyticsQuery(filters);
-        const rows = await this.dbManager.runQuery(sql, params);
+        const { dataSql, dataParams, countSql, countParams } = this._buildAnalyticsQuery(filters);
 
+        const countResult = await this.dbManager.runQuery(countSql, countParams);
+        const totalAllFilteredItems = countResult.length > 0 ? parseInt(countResult[0].total) : 0;
+
+        const rows = await this.dbManager.runQuery(dataSql, dataParams);
         const aggregatedData = this._aggregateAnalyticsData(rows);
 
         return {
             ...aggregatedData,
-            filteredExpenses: rows
+            filteredExpenses: rows,
+            totalAllFilteredItems
         };
     }
 }
