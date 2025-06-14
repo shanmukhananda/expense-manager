@@ -152,7 +152,9 @@ class ExpenseRepository {
         addIdFilter(filters.groupIds, 'e.expense_group_id');
         addIdFilter(filters.payerIds, 'e.payer_id');
 
-        // countParams are no longer needed, summaryParams will be used.
+        let countSql = `SELECT COUNT(*) as total ${baseSql}`;
+        // summaryParams will be based on dataParams before limit/offset, same as countParams would be.
+        const queryParamsWithoutLimitOffset = [...dataParams];
 
         let summarySql = `
             SELECT
@@ -161,12 +163,14 @@ class ExpenseRepository {
                 SUM(CASE WHEN ec.name = 'Refund' THEN -e.amount ELSE e.amount END) as totalNetFigure
             ${baseSql}
         `;
-        const summaryParams = [...dataParams]; // Create summaryParams from dataParams before limit/offset
+        const summaryParams = [...queryParamsWithoutLimitOffset];
+        const countParams = [...queryParamsWithoutLimitOffset];
+
 
         if (whereClauses.length > 0) {
             const whereString = ' WHERE ' + whereClauses.join(' AND ');
             dataSql += whereString;
-            // countSql removed
+            countSql += whereString; // Add whereString to countSql
             summarySql += whereString;
         }
 
@@ -175,7 +179,7 @@ class ExpenseRepository {
         dataSql += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
         dataParams.push(Number(limit), Number(offset));
 
-        return { dataSql, dataParams, summarySql, summaryParams }; // countSql and countParams removed
+        return { dataSql, dataParams, summarySql, summaryParams, countSql, countParams };
     }
 
     _aggregateAnalyticsData(rows) {
@@ -229,21 +233,26 @@ class ExpenseRepository {
     }
 
     async getAnalyticsData(filters = {}) {
-        const { dataSql, dataParams, summarySql, summaryParams } = this._buildAnalyticsQuery(filters);
+        const { dataSql, dataParams, summarySql, summaryParams, countSql, countParams } = this._buildAnalyticsQuery(filters);
 
-        const summaryResult = await this.dbManager.runQuery(summarySql, summaryParams);
+        // Execute all queries concurrently for efficiency
+        const [summaryResult, countResult, rows] = await Promise.all([
+            this.dbManager.runQuery(summarySql, summaryParams),
+            this.dbManager.runQuery(countSql, countParams),
+            this.dbManager.runQuery(dataSql, dataParams)
+        ]);
 
         const grandTotalAmount = summaryResult.length > 0 ? parseFloat(summaryResult[0].totalAmount) || 0 : 0;
-        const totalAllFilteredItems = summaryResult.length > 0 ? parseInt(summaryResult[0].totalCount) || 0 : 0;
         const grandTotalNetFigure = summaryResult.length > 0 ? parseFloat(summaryResult[0].totalNetFigure) || 0 : 0;
+        // totalAllFilteredItems is now taken from the dedicated count query
+        const totalAllFilteredItems = countResult.length > 0 ? parseInt(countResult[0].total) || 0 : 0;
 
-        const rows = await this.dbManager.runQuery(dataSql, dataParams);
         const pageAggregatedData = this._aggregateAnalyticsData(rows);
 
         return {
             grandTotalAmount,
             grandTotalNetFigure,
-            totalAllFilteredItems,
+            totalAllFilteredItems, // Derived from countSql
             filteredExpenses: rows,
             categoryBreakdown: pageAggregatedData.categoryBreakdown,
             pageOverallTotal: pageAggregatedData.overallTotal,
