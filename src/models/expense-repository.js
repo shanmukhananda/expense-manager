@@ -163,7 +163,7 @@ class ExpenseRepository {
 
         dataSql += ` ORDER BY e.date DESC`;
         dataSql += ` LIMIT $${paramIndex++} OFFSET $${paramIndex++}`;
-        dataParams.push(limit, offset);
+        dataParams.push(Number(limit), Number(offset));
 
         return { dataSql, dataParams, countSql, countParams };
     }
