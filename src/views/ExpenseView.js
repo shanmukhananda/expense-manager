@@ -70,19 +70,19 @@ export class ExpenseView {
     }
 
     _clearAddExpenseForm() {
-        this._setDefaultExpenseDate(); // Reset date to today
-        this.elements.expenseAmount.value = '';
-        this.elements.expenseGroupSelect.selectedIndex = 0; // Reset to default "Select Group"
-        this.elements.expenseCategorySelect.selectedIndex = 0;
-        this.elements.expensePayerSelect.selectedIndex = 0;
-        this.elements.expensePaymentModeSelect.selectedIndex = 0;
-        this.elements.expenseDescription.value = '';
+        this._setDefaultExpenseDate();
+        if(this.elements.expenseAmount) this.elements.expenseAmount.value = '';
+        if(this.elements.expenseGroupSelect) this.elements.expenseGroupSelect.selectedIndex = 0;
+        if(this.elements.expenseCategorySelect) this.elements.expenseCategorySelect.selectedIndex = 0;
+        if(this.elements.expensePayerSelect) this.elements.expensePayerSelect.selectedIndex = 0;
+        if(this.elements.expensePaymentModeSelect) this.elements.expensePaymentModeSelect.selectedIndex = 0;
+        if(this.elements.expenseDescription) this.elements.expenseDescription.value = '';
     }
 
-    renderExpenses(expenses) {
-        const containerElement = this.elements.expensesList;
+    renderExpenses(expenses, targetContainer = null, onEdit = null, onDelete = null) {
+        const containerElement = targetContainer || this.elements.expensesList;
         if (!containerElement) {
-            console.error("Expenses list container not found.");
+            console.error("Expenses list container not found in ExpenseView.renderExpenses.");
             return;
         }
         containerElement.innerHTML = ''; // Clear previous content
@@ -96,7 +96,7 @@ export class ExpenseView {
 
         sortedExpenses.forEach(exp => {
             const expenseDiv = this._createExpenseListItem(exp);
-            this._addExpenseListItemListeners(expenseDiv, exp);
+            this._addExpenseListItemListeners(expenseDiv, exp, onEdit, onDelete); // Pass callbacks
             containerElement.appendChild(expenseDiv);
         });
     }
@@ -150,27 +150,23 @@ export class ExpenseView {
         return expenseDiv;
     }
 
-    _addExpenseListItemListeners(expenseDiv, exp) {
+    _addExpenseListItemListeners(expenseDiv, exp, onEdit, onDelete) {
         const editBtn = expenseDiv.querySelector('.edit-expense-btn');
-        if (editBtn) {
+        const actualOnEdit = onEdit || this.actionCallbacks.onEditExpense; // Use passed or default
+
+        if (editBtn && actualOnEdit) {
             editBtn.addEventListener('click', () => {
-                // Master data (groups, categories, etc.) needs to be passed to showEditExpenseModal
-                // This implies UIManager or AppController needs to provide it when calling this.
-                // For now, assume it's available via this.masterData which UIManager would set.
                 if (this.masterData) {
-                     this.modalManager.showEditExpenseModal(exp, this.masterData, async () => {
+                    this.modalManager.showEditExpenseModal(exp, this.masterData, async () => {
                         const updatedExpenseData = this.modalManager.getEditExpenseFormData();
                         if (!this._validateExpenseFormData(updatedExpenseData, true)) {
-                            // Modal stays open for correction if validation fails
                             return;
                         }
                         try {
-                            await this.actionCallbacks.onEditExpense(updatedExpenseData);
-                            this.modalManager.hideEditExpenseModal(); // Hide on success
+                            await actualOnEdit(updatedExpenseData); // Use the resolved callback
+                            this.modalManager.hideEditExpenseModal();
                         } catch (error) {
                             console.error('Error editing expense:', error);
-                            // Optionally, show error in modal or as a general info message
-                            // For now, modal stays open for user to retry or cancel
                             this.showInfoModal('Error', `Failed to save changes: ${error.message}`);
                         }
                     });
@@ -182,16 +178,22 @@ export class ExpenseView {
         }
 
         const deleteBtn = expenseDiv.querySelector('.delete-expense-btn');
-        if (deleteBtn) {
+        const actualOnDelete = onDelete || this.actionCallbacks.onDeleteExpense; // Use passed or default
+
+        if (deleteBtn && actualOnDelete) {
             deleteBtn.addEventListener('click', () => {
-                this.modalManager.showDeleteModal('Delete Expense', `Are you sure you want to delete this expense (Amount: ${exp.amount}, Date: ${exp.date})? This action cannot be undone.`, async () => {
-                    try {
-                        await this.actionCallbacks.onDeleteExpense(exp.id);
-                    } catch (error) {
-                        console.error('Error deleting expense:', error);
-                        this.showInfoModal('Error', `Failed to delete expense. ${error.message}`);
+                this.modalManager.showDeleteModal(
+                    'Delete Expense',
+                    `Are you sure you want to delete this expense (Amount: ${exp.amount}, Date: ${exp.date})? This action cannot be undone.`,
+                    async () => {
+                        try {
+                            await actualOnDelete(exp.id); // Use the resolved callback
+                        } catch (error) {
+                            console.error('Error deleting expense:', error);
+                            this.showInfoModal('Error', `Failed to delete expense. ${error.message}`);
+                        }
                     }
-                });
+                );
             });
         }
     }

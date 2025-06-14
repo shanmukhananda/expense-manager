@@ -236,7 +236,9 @@ export class UIManager {
     renderPayers(payers) { this.entityListView.renderPayers(payers); }
     renderPaymentModes(paymentModes) { this.entityListView.renderPaymentModes(paymentModes); }
 
-    renderExpenses(expenses) { this.expenseView.renderExpenses(expenses); }
+    renderExpenses(expenses, targetContainer = null, onEdit = null, onDelete = null) {
+        this.expenseView.renderExpenses(expenses, targetContainer, onEdit, onDelete);
+    }
 
     _populateDropdownUtility(selectElement, entities, defaultOptionText) {
         if (!selectElement) return;
